@@ -1,0 +1,31 @@
+# Data sources
+sources:
+  alpha_vantage:
+    enabled: true
+    api_key: ${ALPHA_VANTAGE_API_KEY}
+    symbols: [AAPL, MSFT, GOOGL]
+
+# Transformation rules
+transformation:
+  cleaning:
+    max_missing_pct: 20
+    handle_outliers: true
+  
+  feature_engineering:
+    create_lags: true
+    lag_periods: [1, 5, 10, 20]
+
+# Loading targets
+loading:
+  postgresql:
+    schema: analytics
+    tables:
+      fact_price:
+        method: upsert
+        conflict_columns: [date_key, asset_key]
+
+# Schedules (cron)
+schedules:
+  market_data_daily:
+    cron: "0 1 * * *"  # 1 AM daily
+    timezone: UTC
