@@ -1,0 +1,233 @@
+# =============================================================================
+# DOCKER-COMPOSE CONFIGURATION FOR ETL PIPELINE
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: etl_postgres
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-etl_pipeline}
+      POSTGRES_USER: ${DATABASE_USER:-etl_user}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-change_me}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-etl_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl_network
+    restart: unless-stopped
+
+  # Redis (for caching and task queue)
+  redis:
+    image: redis:7-alpine
+    container_name: etl_redis
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - etl_network
+    restart: unless-stopped
+
+  # MinIO (S3-compatible object storage)
+  minio:
+    image: minio/minio:latest
+    container_name: etl_minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - etl_network
+    restart: unless-stopped
+
+  # Prefect Server (Orchestration)
+  prefect-server:
+    image: prefecthq/prefect:2-latest
+    container_name: etl_prefect_server
+    environment:
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${DATABASE_USER:-etl_user}:${DATABASE_PASSWORD:-change_me}@postgres:5432/${DATABASE_NAME:-etl_pipeline}
+    command: prefect server start
+    ports:
+      - "${PREFECT_PORT:-4200}:4200"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - etl_network
+    restart: unless-stopped
+
+  # ETL Worker (Prefect Agent)
+  etl-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: etl_worker
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${DATABASE_USER:-etl_user}:${DATABASE_PASSWORD:-change_me}@postgres:5432/${DATABASE_NAME:-etl_pipeline}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${DATABASE_NAME:-etl_pipeline}
+      DATABASE_USER: ${DATABASE_USER:-etl_user}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-change_me}
+      
+      # API Keys
+      ALPHA_VANTAGE_API_KEY: ${ALPHA_VANTAGE_API_KEY}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      FRED_API_KEY: ${FRED_API_KEY}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+      
+      # S3/MinIO
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-etl-data}
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # Prefect
+      PREFECT_API_URL: http://prefect-server:4200/api
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+    command: prefect agent start -q default
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      prefect-server:
+        condition: service_started
+    networks:
+      - etl_network
+    restart: unless-stopped
+
+  # ETL Scheduler
+  etl-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: etl_scheduler
+    environment:
+      DATABASE_URL: postgresql://${DATABASE_USER:-etl_user}:${DATABASE_PASSWORD:-change_me}@postgres:5432/${DATABASE_NAME:-etl_pipeline}
+      PREFECT_API_URL: http://prefect-server:4200/api
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: python -m scheduler.main
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    depends_on:
+      - prefect-server
+    networks:
+      - etl_network
+    restart: unless-stopped
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: etl_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - etl_network
+    restart: unless-stopped
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: etl_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - etl_network
+    restart: unless-stopped
+
+  # PGAdmin (Database Management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: etl_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - etl_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  etl_network:
+    driver: bridge
+
