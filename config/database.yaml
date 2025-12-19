@@ -1,0 +1,761 @@
+# config/database.yaml
+# Database configuration for ETL pipeline
+
+# Supabase Configuration
+supabase:
+  # Connection settings
+  connection:
+    pool_size: 20
+    max_overflow: 10
+    pool_timeout: 30  # seconds
+    pool_recycle: 3600  # seconds
+    connect_timeout: 10  # seconds
+    statement_timeout: 30000  # milliseconds
+    idle_in_transaction_session_timeout: 10000  # milliseconds
+  
+  # SSL configuration
+  ssl:
+    enabled: true
+    require: true
+    verify: true
+  
+  # Connection retry settings
+  retry:
+    max_attempts: 3
+    base_delay: 1  # seconds
+    max_delay: 60  # seconds
+    backoff_factor: 2
+  
+  # Monitoring
+  monitor:
+    check_interval: 300  # seconds
+    stale_timeout: 600  # seconds
+
+# Database Schema Configuration
+schemas:
+  # Raw data schema (staging area)
+  raw:
+    name: "raw_data"
+    description: "Staging area for raw extracted data"
+    retention_days: 30
+    vacuum_settings:
+      autovacuum_enabled: true
+      autovacuum_vacuum_threshold: 50
+      autovacuum_analyze_threshold: 50
+  
+  # Processed data schema
+  processed:
+    name: "processed_data"
+    description: "Cleaned and transformed data"
+    retention_days: 365
+    partition_settings:
+      enabled: true
+      strategy: "range"
+      column: "date"
+      interval: "monthly"
+  
+  # Analytics schema (star schema)
+  analytics:
+    name: "analytics"
+    description: "Data warehouse schema for analytics"
+    retention_days: 1095  # 3 years
+    
+    # Fact tables
+    fact_tables:
+      stock_fact:
+        name: "fact_stock_prices"
+        grain: "Daily stock prices per symbol"
+        partition_by: "year"
+        cluster_by: ["symbol", "date"]
+      
+      crypto_fact:
+        name: "fact_crypto_prices"
+        grain: "Hourly cryptocurrency prices"
+        partition_by: "month"
+        cluster_by: ["symbol", "exchange", "timestamp"]
+      
+      economic_fact:
+        name: "fact_economic_indicators"
+        grain: "Economic indicators time series"
+        partition_by: "year"
+        cluster_by: ["series_id", "date"]
+    
+    # Dimension tables
+    dimension_tables:
+      date_dim:
+        name: "dim_date"
+        description: "Date dimension table"
+        start_date: "2000-01-01"
+        end_date: "2030-12-31"
+      
+      symbol_dim:
+        name: "dim_symbol"
+        description: "Stock/Crypto symbol dimension"
+        columns:
+          - name: "symbol_id"
+            type: "serial"
+            primary_key: true
+          - name: "symbol"
+            type: "varchar(20)"
+          - name: "name"
+            type: "varchar(200)"
+          - name: "type"
+            type: "varchar(50)"  # stock, crypto, forex, etc.
+          - name: "sector"
+            type: "varchar(100)"
+          - name: "industry"
+            type: "varchar(200)"
+          - name: "currency"
+            type: "varchar(3)"
+          - name: "exchange"
+            type: "varchar(50)"
+          - name: "country"
+            type: "varchar(100)"
+          - name: "is_active"
+            type: "boolean"
+            default: true
+      
+      source_dim:
+        name: "dim_data_source"
+        description: "Data source dimension"
+        columns:
+          - name: "source_id"
+            type: "serial"
+            primary_key: true
+          - name: "source_name"
+            type: "varchar(100)"
+          - name: "api_provider"
+            type: "varchar(100)"
+          - name: "data_type"
+            type: "varchar(50)"
+          - name: "update_frequency"
+            type: "varchar(50)"
+          - name: "last_successful_fetch"
+            type: "timestamp"
+  
+  # ML schema (optimized for time-series)
+  ml:
+    name: "ml_data"
+    description: "Machine learning ready data"
+    retention_days: 730  # 2 years
+    
+    tables:
+      time_series_features:
+        name: "time_series_features"
+        partition_by: "symbol"
+        indexes:
+          - columns: ["symbol", "timestamp"]
+            type: "btree"
+            unique: true
+          - columns: ["timestamp"]
+            type: "brin"
+        
+        optimization:
+          fillfactor: 90
+          autovacuum_vacuum_scale_factor: 0.01
+          autovacuum_analyze_scale_factor: 0.005
+      
+      training_sets:
+        name: "training_sets"
+        partition_by: "model_name"
+        columns:
+          - name: "set_id"
+            type: "uuid"
+            default: "gen_random_uuid()"
+          - name: "model_name"
+            type: "varchar(100)"
+          - name: "feature_set"
+            type: "jsonb"
+          - name: "train_start_date"
+            type: "date"
+          - name: "train_end_date"
+            type: "date"
+          - name: "test_start_date"
+            type: "date"
+          - name: "test_end_date"
+            type: "date"
+          - name: "created_at"
+            type: "timestamp"
+            default: "CURRENT_TIMESTAMP"
+  
+  # Metadata schema
+  metadata:
+    name: "pipeline_metadata"
+    description: "ETL pipeline execution metadata"
+    retention_days: 90
+    
+    tables:
+      pipeline_runs:
+        name: "pipeline_runs"
+        columns:
+          - name: "run_id"
+            type: "uuid"
+            default: "gen_random_uuid()"
+            primary_key: true
+          - name: "pipeline_name"
+            type: "varchar(100)"
+          - name: "status"
+            type: "varchar(20)"
+          - name: "start_time"
+            type: "timestamptz"
+          - name: "end_time"
+            type: "timestamptz"
+          - name: "duration_seconds"
+            type: "integer"
+          - name: "records_processed"
+            type: "integer"
+          - name: "records_failed"
+            type: "integer"
+          - name: "error_message"
+            type: "text"
+          - name: "parameters"
+            type: "jsonb"
+        
+        indexes:
+          - columns: ["pipeline_name", "start_time"]
+          - columns: ["status"]
+          - columns: ["start_time"]
+      
+      source_status:
+        name: "source_status"
+        columns:
+          - name: "source_id"
+            type: "varchar(100)"
+            primary_key: true
+          - name: "last_successful_run"
+            type: "timestamptz"
+          - name: "last_extracted_date"
+            type: "date"
+          - name: "total_records"
+            type: "bigint"
+          - name: "last_error"
+            type: "text"
+          - name: "consecutive_failures"
+            type: "integer"
+            default: 0
+          - name: "is_active"
+            type: "boolean"
+            default: true
+          - name: "next_scheduled_run"
+            type: "timestamptz"
+          - name: "updated_at"
+            type: "timestamptz"
+            default: "CURRENT_TIMESTAMP"
+      
+      data_quality:
+        name: "data_quality_metrics"
+        columns:
+          - name: "check_id"
+            type: "uuid"
+            default: "gen_random_uuid()"
+          - name: "table_name"
+            type: "varchar(100)"
+          - name: "check_date"
+            type: "date"
+          - name: "check_type"
+            type: "varchar(50)"  # completeness, accuracy, consistency, timeliness
+          - name: "metric_name"
+            type: "varchar(100)"
+          - name: "metric_value"
+            type: "numeric"
+          - name: "threshold"
+            type: "numeric"
+          - name: "status"
+            type: "varchar(20)"  # pass, warn, fail
+          - name: "details"
+            type: "jsonb"
+        
+        indexes:
+          - columns: ["table_name", "check_date"]
+          - columns: ["status", "check_date"]
+
+# Table Configurations
+tables:
+  # Stock prices table
+  stock_prices:
+    schema: "processed"
+    name: "stock_prices"
+    description: "Daily stock prices"
+    
+    columns:
+      - name: "id"
+        type: "uuid"
+        default: "gen_random_uuid()"
+        primary_key: true
+      - name: "symbol"
+        type: "varchar(20)"
+        not_null: true
+      - name: "date"
+        type: "date"
+        not_null: true
+      - name: "open"
+        type: "numeric(12,4)"
+      - name: "high"
+        type: "numeric(12,4)"
+      - name: "low"
+        type: "numeric(12,4)"
+      - name: "close"
+        type: "numeric(12,4)"
+        not_null: true
+      - name: "adj_close"
+        type: "numeric(12,4)"
+      - name: "volume"
+        type: "bigint"
+      - name: "dividend_amount"
+        type: "numeric(10,4)"
+      - name: "split_coefficient"
+        type: "numeric(10,4)"
+      - name: "source"
+        type: "varchar(50)"
+      - name: "created_at"
+        type: "timestamptz"
+        default: "CURRENT_TIMESTAMP"
+      - name: "updated_at"
+        type: "timestamptz"
+        default: "CURRENT_TIMESTAMP"
+    
+    constraints:
+      unique: ["symbol", "date", "source"]
+      check:
+        - "open > 0"
+        - "high >= low"
+        - "close > 0"
+        - "volume >= 0"
+    
+    indexes:
+      - columns: ["symbol", "date"]
+        type: "btree"
+        unique: true
+      - columns: ["date"]
+        type: "brin"
+      - columns: ["symbol"]
+        type: "btree"
+      - columns: ["source", "date"]
+        type: "btree"
+    
+    partition:
+      enabled: true
+      type: "range"
+      column: "date"
+      interval: "month"
+      retention_months: 36
+    
+    optimization:
+      fillfactor: 90
+      autovacuum_enabled: true
+      autovacuum_vacuum_threshold: 1000
+      autovacuum_analyze_threshold: 500
+  
+  # Cryptocurrency prices table
+  crypto_prices:
+    schema: "processed"
+    name: "crypto_prices"
+    description: "Cryptocurrency prices (minute/hourly/daily)"
+    
+    columns:
+      - name: "id"
+        type: "uuid"
+        default: "gen_random_uuid()"
+        primary_key: true
+      - name: "symbol"
+        type: "varchar(20)"
+        not_null: true
+      - name: "exchange"
+        type: "varchar(50)"
+        not_null: true
+      - name: "timestamp"
+        type: "timestamptz"
+        not_null: true
+      - name: "open"
+        type: "numeric(20,8)"
+      - name: "high"
+        type: "numeric(20,8)"
+      - name: "low"
+        type: "numeric(20,8)"
+      - name: "close"
+        type: "numeric(20,8)"
+        not_null: true
+      - name: "volume"
+        type: "numeric(30,8)"
+      - name: "quote_volume"
+        type: "numeric(30,8)"
+      - name: "trade_count"
+        type: "integer"
+      - name: "interval"
+        type: "varchar(10)"  # 1m, 5m, 1h, 1d
+      - name: "source"
+        type: "varchar(50)"
+      - name: "created_at"
+        type: "timestamptz"
+        default: "CURRENT_TIMESTAMP"
+    
+    constraints:
+      unique: ["symbol", "exchange", "timestamp", "interval"]
+      check:
+        - "open > 0"
+        - "high >= low"
+        - "close > 0"
+        - "volume >= 0"
+    
+    indexes:
+      - columns: ["symbol", "exchange", "timestamp"]
+        type: "btree"
+        unique: true
+      - columns: ["timestamp"]
+        type: "brin"
+      - columns: ["symbol", "interval"]
+        type: "btree"
+    
+    partition:
+      enabled: true
+      type: "range"
+      column: "timestamp"
+      interval: "day"
+      retention_days: 90
+  
+  # Economic indicators table
+  economic_indicators:
+    schema: "processed"
+    name: "economic_indicators"
+    description: "Economic indicators from FRED and other sources"
+    
+    columns:
+      - name: "id"
+        type: "uuid"
+        default: "gen_random_uuid()"
+        primary_key: true
+      - name: "series_id"
+        type: "varchar(50)"
+        not_null: true
+      - name: "date"
+        type: "date"
+        not_null: true
+      - name: "value"
+        type: "numeric(20,6)"
+        not_null: true
+      - name: "realtime_start"
+        type: "date"
+      - name: "realtime_end"
+        type: "date"
+      - name: "frequency"
+        type: "varchar(10)"  # D, W, M, Q, A
+      - name: "units"
+        type: "varchar(50)"
+      - name: "seasonal_adjustment"
+        type: "varchar(10)"
+      - name: "source"
+        type: "varchar(50)"
+        default: "'fred'"
+      - name: "created_at"
+        type: "timestamptz"
+        default: "CURRENT_TIMESTAMP"
+    
+    constraints:
+      unique: ["series_id", "date", "source"]
+    
+    indexes:
+      - columns: ["series_id", "date"]
+        type: "btree"
+        unique: true
+      - columns: ["date"]
+        type: "brin"
+      - columns: ["series_id"]
+        type: "btree"
+  
+  # Weather data table
+  weather_data:
+    schema: "processed"
+    name: "weather_data"
+    description: "Weather data from various sources"
+    
+    columns:
+      - name: "id"
+        type: "uuid"
+        default: "gen_random_uuid()"
+        primary_key: true
+      - name: "location"
+        type: "varchar(100)"
+        not_null: true
+      - name: "latitude"
+        type: "numeric(9,6)"
+      - name: "longitude"
+        type: "numeric(9,6)"
+      - name: "timestamp"
+        type: "timestamptz"
+        not_null: true
+      - name: "temperature"
+        type: "numeric(5,2)"  # Celsius
+      - name: "humidity"
+        type: "numeric(5,2)"  # Percentage
+      - name: "pressure"
+        type: "numeric(7,2)"  # hPa
+      - name: "wind_speed"
+        type: "numeric(6,2)"  # m/s
+      - name: "wind_direction"
+        type: "numeric(5,2)"  # Degrees
+      - name: "precipitation"
+        type: "numeric(6,2)"  # mm
+      - name: "cloud_cover"
+        type: "numeric(5,2)"  # Percentage
+      - name: "weather_condition"
+        type: "varchar(100)"
+      - name: "source"
+        type: "varchar(50)"
+      - name: "created_at"
+        type: "timestamptz"
+        default: "CURRENT_TIMESTAMP"
+    
+    constraints:
+      unique: ["location", "timestamp", "source"]
+      check:
+        - "humidity BETWEEN 0 AND 100"
+        - "cloud_cover BETWEEN 0 AND 100"
+        - "precipitation >= 0"
+    
+    indexes:
+      - columns: ["location", "timestamp"]
+        type: "btree"
+        unique: true
+      - columns: ["timestamp"]
+        type: "brin"
+      - columns: ["latitude", "longitude"]
+        type: "gist"
+  
+  # Sentiment data table
+  sentiment_data:
+    schema: "processed"
+    name: "sentiment_data"
+    description: "Sentiment data from news and social media"
+    
+    columns:
+      - name: "id"
+        type: "uuid"
+        default: "gen_random_uuid()"
+        primary_key: true
+      - name: "source"
+        type: "varchar(50)"
+        not_null: true  # twitter, reddit, news_api, etc.
+      - name: "entity"
+        type: "varchar(100)"
+        not_null: true  # AAPL, BTC, etc.
+      - name: "entity_type"
+        type: "varchar(50)"  # stock, crypto, forex, commodity
+      - name: "timestamp"
+        type: "timestamptz"
+        not_null: true
+      - name: "sentiment_score"
+        type: "numeric(5,4)"  # -1 to 1
+      - name: "sentiment_magnitude"
+        type: "numeric(5,4)"  # 0 to 1
+      - name: "confidence"
+        type: "numeric(5,4)"  # 0 to 1
+      - name: "language"
+        type: "varchar(10)"
+      - name: "country"
+        type: "varchar(2)"
+      - name: "raw_text"
+        type: "text"
+      - name: "processed_text"
+        type: "text"
+      - name: "url"
+        type: "varchar(500)"
+      - name: "author"
+        type: "varchar(200)"
+      - name: "created_at"
+        type: "timestamptz"
+        default: "CURRENT_TIMESTAMP"
+    
+    constraints:
+      unique: ["source", "entity", "timestamp", "url"]
+      check:
+        - "sentiment_score BETWEEN -1 AND 1"
+        - "sentiment_magnitude BETWEEN 0 AND 1"
+        - "confidence BETWEEN 0 AND 1"
+    
+    indexes:
+      - columns: ["entity", "timestamp"]
+        type: "btree"
+      - columns: ["timestamp"]
+        type: "brin"
+      - columns: ["source", "entity_type"]
+        type: "btree"
+      - columns: ["sentiment_score"]
+        type: "btree"
+      - columns: ["processed_text"]
+        type: "gin"
+        using: "gin(to_tsvector('english', processed_text))"
+
+# Data Retention Policies
+retention:
+  raw_data:
+    days: 30
+    vacuum: true
+    archive_before_delete: true
+  
+  processed_data:
+    days: 365
+    partition_management: true
+  
+  analytics_data:
+    years: 3
+    aggregate_before_delete: true
+  
+  metadata:
+    days: 90
+    summary_before_delete: true
+
+# Performance Optimization
+performance:
+  # Connection pooling
+  connection_pool:
+    size: 20
+    max_overflow: 10
+    recycle: 3600
+    
+  # Query optimization
+  query:
+    default_statistics_target: 100
+    work_mem: "64MB"
+    maintenance_work_mem: "256MB"
+    
+  # Index optimization
+  indexes:
+    fillfactor: 90
+    vacuum_scale_factor: 0.1
+    analyze_scale_factor: 0.05
+    
+  # Partitioning strategy
+  partitioning:
+    enabled: true
+    default_strategy: "range"
+    subpartition: false
+    constraint_exclusion: true
+
+# Backup Configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention_days: 30
+  format: "custom"
+  compression: "gzip"
+  
+  # Tables to exclude from backup
+  exclude_tables:
+    - "*.tmp_*"
+    - "raw_data.*"
+    
+  # Include schemas
+  include_schemas:
+    - "processed"
+    - "analytics"
+    - "ml"
+    - "pipeline_metadata"
+
+# Security Configuration
+security:
+  # Row Level Security
+  rls:
+    enabled: true
+    policies:
+      - table: "processed.stock_prices"
+        policy: "read_access"
+        command: "SELECT"
+        using: "true"
+      
+      - table: "pipeline_metadata.pipeline_runs"
+        policy: "admin_access"
+        command: "ALL"
+        using: "current_user = 'etl_admin'"
+  
+  # Encryption
+  encryption:
+    at_rest: true
+    in_transit: true
+    
+  # Audit logging
+  audit:
+    enabled: true
+    tables:
+      - "pipeline_metadata.*"
+      - "analytics.dim_symbol"
+    retention_days: 365
+
+# Maintenance Tasks
+maintenance:
+  vacuum:
+    schedule: "0 3 * * *"  # Daily at 3 AM
+    analyze: true
+    full: false
+    freeze_min_age: 50000000
+    
+  reindex:
+    schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+    concurrently: true
+    
+  statistics:
+    schedule: "0 2 * * *"
+    extended: true
+    
+  partition_management:
+    schedule: "0 1 * * *"
+    create_future_months: 3
+    drop_old_months: 36
+
+# Monitoring Queries
+monitoring:
+  # Health check queries
+  health_checks:
+    - name: "database_connections"
+      query: "SELECT count(*) FROM pg_stat_activity WHERE state = 'active';"
+      warning_threshold: 50
+      critical_threshold: 80
+    
+    - name: "table_size_growth"
+      query: |
+        SELECT schemaname, tablename,
+               pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename)) as size,
+               pg_total_relation_size(schemaname || '.' || tablename) as size_bytes
+        FROM pg_tables
+        WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+        ORDER BY size_bytes DESC
+        LIMIT 10;
+      check_interval: 3600
+    
+    - name: "long_running_queries"
+      query: |
+        SELECT pid, now() - pg_stat_activity.query_start AS duration, query
+        FROM pg_stat_activity
+        WHERE state = 'active' 
+          AND now() - pg_stat_activity.query_start > interval '5 minutes'
+        ORDER BY duration DESC;
+      warning_threshold: "5 minutes"
+      critical_threshold: "30 minutes"
+    
+  # Data quality metrics
+  data_quality:
+    - name: "missing_stock_prices"
+      query: |
+        SELECT symbol, COUNT(*) as missing_days
+        FROM generate_series(
+          CURRENT_DATE - INTERVAL '30 days',
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        ) as date
+        CROSS JOIN (SELECT DISTINCT symbol FROM processed.stock_prices) symbols
+        LEFT JOIN processed.stock_prices sp 
+          ON sp.symbol = symbols.symbol AND sp.date = date.date
+        WHERE date.date <= CURRENT_DATE
+          AND EXTRACT(DOW FROM date.date) NOT IN (0, 6)  -- Exclude weekends
+        GROUP BY symbols.symbol
+        HAVING COUNT(CASE WHEN sp.symbol IS NULL THEN 1 END) > 2;
+      
+    - name: "anomalous_values"
+      query: |
+        SELECT symbol, date,
+               CASE 
+                 WHEN close > open * 1.5 THEN 'large_gain'
+                 WHEN close < open * 0.5 THEN 'large_loss'
+                 WHEN volume > AVG(volume) OVER (PARTITION BY symbol ORDER BY date ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING) * 10 THEN 'high_volume'
+               END as anomaly_type
+        FROM processed.stock_prices
+        WHERE date >= CURRENT_DATE - INTERVAL '7 days';

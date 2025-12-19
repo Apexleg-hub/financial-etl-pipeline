@@ -1,0 +1,48 @@
+sources:
+  alpha_vantage:
+    base_url: "https://www.alphavantage.co/query"
+    endpoints:
+      time_series_daily: "function=TIME_SERIES_DAILY"
+      time_series_intraday: "function=TIME_SERIES_INTRADAY"
+      forex_daily: "function=FX_DAILY"
+    rate_limit: 5  # requests per minute
+    retry_delay: 60  # seconds
+
+ 
+    
+  finnhub:
+    base_url: "https://finnhub.io/api/v1"
+    endpoints:
+      quote: "/quote"
+      company_profile: "/stock/profile2"
+      economic_calendar: "/calendar/economic"
+    rate_limit: 60  # requests per minute
+  
+  fred:
+    base_url: "https://api.stlouisfed.org/fred"
+    endpoints:
+      series: "/series/observations"
+    rate_limit: 120  # requests per minute
+  
+  crypto:
+    exchanges:
+      binance: "https://api.binance.com/api/v3"
+      coinbase: "https://api.coinbase.com/v2"
+    rate_limit: 10
+  
+  weather:
+    base_url: "http://api.openweathermap.org/data/2.5"
+    endpoints:
+      forecast: "/forecast"
+      historical: "/onecall/timemachine"
+    rate_limit: 60
+  
+extraction:
+  batch_size: 1000
+  incremental_field: "last_updated"
+  default_timezone: "UTC"
+  
+transformation:
+  missing_value_threshold: 0.1
+  anomaly_zscore_threshold: 3.0
+  default_currency: "USD"
