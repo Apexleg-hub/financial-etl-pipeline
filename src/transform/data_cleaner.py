@@ -4,7 +4,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from ..utils.logger import logger
-from ..config.settings import settings
+from config.settings import settings
 
 
 class DataCleaner:
