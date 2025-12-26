@@ -1,63 +1,137 @@
-version: '3.8'
+
 
 services:
-  etl-pipeline:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    container_name: etl_pipeline
+  postgres:
+    image: postgres:13
+    container_name: etl_postgres
     environment:
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
-      - FINNHUB_API_KEY=${FINNHUB_API_KEY}
-      - FRED_API_KEY=${FRED_API_KEY}
-      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
-      - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:-airflow}
     volumes:
-      - ./logs:/app/logs
-      - ./data:/app/data
-    restart: unless-stopped
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health', timeout=2)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER:-airflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  airflow:
-    image: apache/airflow:2.5.1
-    container_name: airflow
+  airflow-init:
+    image: apache/airflow:2.7.1
+    container_name: etl_airflow_init
+    depends_on:
+      - postgres
     environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@postgres/${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
     volumes:
       - ./dags:/opt/airflow/dags
-      - ./logs/airflow:/opt/airflow/logs
+      - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-    ports:
-      - "8080:8080"
+      - ./config:/opt/airflow/config
     command: >
       bash -c "
         airflow db init &&
-        airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin &&
-        airflow webserver & airflow scheduler
+        airflow users create \
+          --username ${AIRFLOW_USERNAME:-admin} \
+          --firstname ${AIRFLOW_FIRSTNAME:-Admin} \
+          --lastname ${AIRFLOW_LASTNAME:-User} \
+          --role Admin \
+          --email ${AIRFLOW_EMAIL:-admin@example.com} \
+          --password ${AIRFLOW_PASSWORD:-admin}
       "
+    restart: on-failure
+
+  airflow-webserver:
+    image: apache/airflow:2.7.1
+    container_name: etl_airflow_webserver
     depends_on:
       - postgres
-
-  postgres:
-    image: postgres:13
-    container_name: postgres
+      - airflow-init
     environment:
-      - POSTGRES_USER=airflow
-      - POSTGRES_PASSWORD=airflow
-      - POSTGRES_DB=airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@postgres/${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_FERNET_KEY}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./config:/opt/airflow/config
+      - ./src:/opt/airflow/src
+    ports:
+      - "8080:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.1
+    container_name: etl_airflow_scheduler
+    depends_on:
+      - postgres
+      - airflow-init
+    environment:
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@postgres/${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./config:/opt/airflow/config
+      - ./src:/opt/airflow/src
+    command: scheduler
+    restart: always
+
+  etl-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: etl_pipeline
+    depends_on:
+      - postgres
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # API Keys
+      ALPHA_VANTAGE_API_KEY: ${ALPHA_VANTAGE_API_KEY}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      FRED_API_KEY: ${FRED_API_KEY}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+      # Supabase
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      SUPABASE_DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      # Database
+      AIRFLOW_DB_HOST: postgres
+      AIRFLOW_DB_PORT: 5432
+      AIRFLOW_DB_NAME: ${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW_DB_USER: ${AIRFLOW_DB_USER:-airflow}
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow}
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./src:/app/src
+    command: >
+      bash -c "
+        echo 'Starting ETL Pipeline...' &&
+        python -m src.cli health-check &&
+        tail -f /dev/null
+      "
+    restart: unless-stopped
 
 volumes:
   postgres_data:
