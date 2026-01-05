@@ -11,3 +11,4 @@ tenacity>=8.1.0
 pytz>=2022.7
 python-dateutil>=2.8.0
 click>=8.1.0
+pytest

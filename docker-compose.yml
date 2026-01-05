@@ -5,14 +5,15 @@ services:
     image: postgres:13
     container_name: etl_postgres
     environment:
-      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
-      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow}
-      POSTGRES_DB: ${AIRFLOW_DB_NAME:-airflow}
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
+    
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER:-airflow}"]
       interval: 10s
@@ -27,7 +28,7 @@ services:
     environment:
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@postgres/${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
     volumes:
       - ./dags:/opt/airflow/dags

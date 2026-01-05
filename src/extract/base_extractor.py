@@ -8,7 +8,7 @@ import requests
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from ..utils.logger import logger
 from ..utils.rate_limiter import rate_limiter
-from ..config.settings import settings
+from config.settings import settings
 
 
 class BaseExtractor(abc.ABC):

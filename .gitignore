@@ -4,7 +4,7 @@
 .env
 .env.example
 .env.template
-start.ps1/
+.start.ps1
 
 
 
@@ -14,4 +14,13 @@ venv/
 
 # Node modules
 node_modules/
+
+# Airflow runtime
+logs/
+airflow.db
+airflow.cfg
+
+# Python build artifacts
+*.egg-info/
+__pycache__/
 

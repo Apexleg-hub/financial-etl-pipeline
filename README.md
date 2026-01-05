@@ -2,9 +2,9 @@
 
 A production-ready ETL (Extract, Transform, Load) pipeline for collecting, processing, and storing financial market data from multiple sources including stock markets, cryptocurrencies, and economic indicators.
 
-## 🏗️ Architecture
+##  Architecture
 
-```
+
 ┌─────────────────────────────────────────────────────────────┐
 │                     Data Sources                            │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       │
@@ -44,9 +44,9 @@ A production-ready ETL (Extract, Transform, Load) pipeline for collecting, proce
         │  - Economic Indicators   │
         │  - ETL Metadata          │
         └──────────────────────────┘
-```
 
-## 🚀 Features
+
+##  Features
 
 - **Multi-Source Data Collection**: Extracts data from:
   - Alpha Vantage (Stock prices, company fundamentals)
@@ -75,7 +75,7 @@ A production-ready ETL (Extract, Transform, Load) pipeline for collecting, proce
   - Batch loading with upsert capability
   - Metadata tracking for pipeline runs
 
-## 📋 Prerequisites
+##  Prerequisites
 
 - Python 3.9+
 - Docker & Docker Compose
@@ -85,39 +85,39 @@ A production-ready ETL (Extract, Transform, Load) pipeline for collecting, proce
   - FRED
 - Supabase account
 
-## 🛠️ Installation
+##  Installation
 
 ### 1. Clone the repository
 
-```bash
+
 git clone <repository-url>
 cd financial-etl-pipeline
-```
+
 
 ### 2. Create virtual environment
 
-```bash
+
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+
 
 ### 3. Install dependencies
 
-```bash
+
 pip install -r requirements.txt
-```
+
 
 ### 4. Configure environment variables
 
 Copy the example environment file and fill in your credentials:
 
-```bash
+
 cp .env.example .env
-```
+
 
 Edit `.env` with your API keys:
 
-```env
+
 # Alpha Vantage
 ALPHA_VANTAGE_API_KEY=your_key_here
 
@@ -140,22 +140,22 @@ AIRFLOW_PASSWORD=admin
 STOCK_SYMBOLS=AAPL,GOOGL,MSFT,AMZN,TSLA
 CRYPTO_SYMBOLS=BTC,ETH,ADA,SOL
 FRED_SERIES=GDP,UNRATE,CPIAUCSL
-```
+
 
 ### 5. Generate Airflow Fernet Key
 
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
 
-## 🐳 Docker Deployment
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+
+##  Docker Deployment
 
 ### Start all services
 
-```bash
+
 cd docker
 docker-compose up -d
-```
+
 
 
 This will start:
@@ -177,17 +177,17 @@ This will start:
 
 ### Stop services
 
-```bash
+
 docker-compose down
-```
+
 
 ### View logs
 
-```bash
-docker-compose logs -f airflow-scheduler
-```
 
-## 💻 Usage
+docker-compose logs -f airflow-scheduler
+
+
+##  Usage
 
 ### Running the ETL Pipeline
 
@@ -200,18 +200,18 @@ docker-compose logs -f airflow-scheduler
 #### Running Standalone Scripts
 
 Extract stock data:
-```bash
+
 python -m src.extract.alpha_vantage
-```
+
 
 Run full pipeline:
-```bash
+
 python scripts/run_etl.py
-```
+
 
 ### Running Tests
 
-```bash
+
 # Run all tests
 pytest
 
@@ -220,11 +220,11 @@ pytest --cov=src --cov-report=html
 
 # Run specific test file
 pytest tests/test_extract.py
-```
 
-## 📁 Project Structure
 
-```
+##  Project Structure
+
+
 financial-etl-pipeline/
 ├── config/                      # Configuration files
 │   ├── database.yaml           # Database configuration
@@ -265,13 +265,13 @@ financial-etl-pipeline/
 ├── .env.example                # Example environment file
 ├── requirements.txt            # Python dependencies
 └── README.md                   # This file
-```
 
-## 🔧 Configuration
+
+##  Configuration
 
 ### Pipeline Configuration (`config/pipeline_config.yaml`)
 
-```yaml
+
 extraction:
   batch_size: 100
   retry_attempts: 3
@@ -285,11 +285,11 @@ transformation:
 loading:
   batch_size: 1000
   upsert_enabled: true
-```
+
 
 ### Data Source Configuration (`config/sources.yaml`)
 
-```yaml
+
 alpha_vantage:
   rate_limit: 5  # requests per minute
   symbols:
@@ -304,11 +304,11 @@ fred:
     - CPIAUCSL
 
 
-## 📊 Database Schema
+##  Database Schema
 
 ### Stock Prices Table
 
-```sql
+
 CREATE TABLE stock_prices (
     id SERIAL PRIMARY KEY,
     symbol VARCHAR(10) NOT NULL,
@@ -323,11 +323,11 @@ CREATE TABLE stock_prices (
     extraction_timestamp TIMESTAMP,
     UNIQUE(symbol, date)
 );
-```
+
 
 ### Crypto Prices Table
 
-```sql
+
 CREATE TABLE crypto_prices (
     id SERIAL PRIMARY KEY,
     symbol VARCHAR(10) NOT NULL,
@@ -340,11 +340,11 @@ CREATE TABLE crypto_prices (
     extraction_timestamp TIMESTAMP,
     UNIQUE(symbol, timestamp)
 );
-```
+
 
 ### Economic Indicators Table
 
-```sql
+
 CREATE TABLE economic_indicators (
     id SERIAL PRIMARY KEY,
     series_id VARCHAR(20) NOT NULL,
@@ -357,9 +357,9 @@ CREATE TABLE economic_indicators (
     extraction_timestamp TIMESTAMP,
     UNIQUE(series_id, date)
 );
-```
 
-## 📈 Monitoring
+
+##  Monitoring
 
 ### Metrics Tracked
 
@@ -377,7 +377,7 @@ Configure alerts in `src/monitoring/alerting.py`:
 - API rate limit warnings
 - Unusual data patterns
 
-## 🔐 Security Best Practices
+##  Security Best Practices
 
 1. **Never commit API keys** - Use `.env` file
 2. **Rotate credentials** regularly
@@ -386,33 +386,33 @@ Configure alerts in `src/monitoring/alerting.py`:
 5. **Implement rate limiting** to avoid API bans
 6. **Monitor access logs** for unusual activity
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
 **Issue**: Airflow DAG not appearing
-```bash
+
 # Check DAG syntax
 python src/orchestration/dags/etl_pipeline.py
 
 # Check Airflow logs
 docker-compose logs airflow-scheduler
-```
+
 
 **Issue**: API rate limit exceeded
-```bash
+
 # Adjust rate limits in config/sources.yaml
 # Or increase delay between requests
-```
+
 
 **Issue**: Database connection failed
-```bash
+
 # Verify Supabase credentials
 # Check network connectivity
 # Ensure database exists
-```
 
-## 🤝 Contributing
+
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -420,15 +420,15 @@ docker-compose logs airflow-scheduler
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under Equalline Limited
 
-## 📧 Contact
+## Contact
 
 For questions or support, please open an issue on GitHub.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Alpha Vantage for stock market data
 - FRED for economic indicators

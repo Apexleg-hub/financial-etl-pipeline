@@ -1,0 +1,42 @@
+# Create .dockerignore to exclude unnecessary files
+@"
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+.env
+
+# Airflow
+logs/
+airflow/logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Data files
+*.csv
+*.xlsx
+*.parquet
+data/
+
+# Large directories
+dags/__pycache__/
+tests/__pycache__/
+"@ | Out-File -FilePath .dockerignore -Encoding UTF8

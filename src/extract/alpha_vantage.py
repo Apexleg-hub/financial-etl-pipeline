@@ -4,7 +4,7 @@ import pandas as pd
 from typing import Dict, Any, Optional
 from datetime import datetime
 from .base_extractor import BaseExtractor
-from ..config.settings import settings
+from config.settings import settings
 from ..utils.logger import logger
 
 

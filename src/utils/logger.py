@@ -34,7 +34,6 @@ class JSONFormatter(logging.Formatter):
         
         return json.dumps(log_record, default=str)
 
-
 class StructuredLogger:
     """Structured JSON logger for ETL pipeline without external dependencies"""
     
@@ -42,8 +41,9 @@ class StructuredLogger:
         self.logger = logging.getLogger(name)
         
         # Set log level
-        self.logger.setLevel(getattr(logging, settings.log_level))
-        
+        settings_dict = settings.model_dump()
+        log_level = settings_dict.get("log_level", "INFO").upper()
+        self.logger.setLevel(getattr(logging, log_level))
         # Remove existing handlers to avoid duplicates
         if self.logger.handlers:
             self.logger.handlers.clear()

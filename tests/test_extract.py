@@ -1,9 +1,16 @@
 # tests/test_extract.py
+import sys
+import os
+
+# FIX: Add this line to make Python find the src module
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import pytest
 from unittest.mock import Mock, patch
 import pandas as pd
 from datetime import datetime
 from src.extract.alpha_vantage import AlphaVantageExtractor
+
 
 
 class TestAlphaVantageExtractor:
@@ -59,3 +66,8 @@ class TestAlphaVantageExtractor:
         
         with pytest.raises(ValueError, match="API Error"):
             extractor._parse_response(invalid_data)
+
+
+# Add this to run the test when executed directly
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
