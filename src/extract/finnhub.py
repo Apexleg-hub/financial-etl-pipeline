@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import pytz
 from .base_extractor import BaseExtractor
-from ..config.settings import settings
+from config.settings import settings
 from ..utils.logger import logger
 from ..utils.rate_limiter import RateLimitConfig, rate_limiter
 

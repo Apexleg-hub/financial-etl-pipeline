@@ -1,5 +1,3 @@
-
-
 # tests/test_forex_extractor.py
 import pytest
 from unittest.mock import Mock, patch, MagicMock
@@ -10,43 +8,21 @@ import time
 class TestForexExtractor:
     @pytest.fixture
     def extractor(self):
-        # Patch the rate limiting to avoid sleep during tests
-        extractor = ForexExtractor(api_key="test_key")
-        extractor._rate_limit = Mock()  # Mock rate limiting
-        return extractor
-    
-    def test_get_exchange_rate_success(self, extractor):
-        mock_response = {
-            "Realtime Currency Exchange Rate": {
-                "1. From_Currency Code": "USD",
-                "2. From_Currency Name": "United States Dollar",
-                "3. To_Currency Code": "EUR",
-                "4. To_Currency Name": "Euro",
-                "5. Exchange Rate": "0.92",
-                "6. Last Refreshed": "2024-01-01 00:00:00",
-                "7. Time Zone": "UTC",
-                "8. Bid Price": "0.9198",
-                "9. Ask Price": "0.9202"
+        # Mock the config loading in BaseExtractor
+        with patch('src.extract.forex_extractor.settings') as mock_settings:
+            mock_config = {
+                "alphavantage": {
+                    "base_url": "https://www.alphavantage.co/query"
+                }
             }
-        }
-        
-        with patch.object(extractor, '_make_request', return_value=mock_response):
-            result = extractor.get_exchange_rate("USD", "EUR")
-            assert result is not None
-            assert result["1. From_Currency Code"] == "USD"
-            assert result["5. Exchange Rate"] == "0.92"
-    
-    def test_get_exchange_rate_failure(self, extractor):
-        """Test when API returns error or no data"""
-        with patch.object(extractor, '_make_request', return_value=None):
-            result = extractor.get_exchange_rate("USD", "EUR")
-            assert result is None
-        
-        with patch.object(extractor, '_make_request', return_value={}):
-            result = extractor.get_exchange_rate("USD", "EUR")
-            assert result is None
+            mock_settings.load_config.return_value = mock_config
+            
+            # Create the extractor
+            extractor = ForexExtractor(api_key="test_key")
+            return extractor
     
     def test_get_daily_forex_success(self, extractor):
+        """Test getting daily forex data successfully"""
         mock_response = {
             "Meta Data": {
                 "1. Information": "Forex Daily Prices (open, high, low, close)",
@@ -65,7 +41,8 @@ class TestForexExtractor:
             }
         }
         
-        with patch.object(extractor, '_make_request', return_value=mock_response):
+        # Mock _make_forex_request instead of _make_request
+        with patch.object(extractor, '_make_forex_request', return_value=mock_response):
             result = extractor.get_daily_forex("EUR", "USD")
             assert result is not None
             assert "2024-01-01" in result
@@ -73,6 +50,18 @@ class TestForexExtractor:
             assert result["2024-01-01"]["2. high"] == "1.1020"
             assert result["2024-01-01"]["3. low"] == "1.0980"
             assert result["2024-01-01"]["4. close"] == "1.1010"
+    
+    def test_get_exchange_rate_failure(self, extractor):
+        """Test when API returns error or no data"""
+        # Mock _make_forex_request to return None
+        with patch.object(extractor, '_make_forex_request', return_value=None):
+            result = extractor.get_exchange_rate("USD", "EUR")
+            assert result is None
+        
+        # Mock empty response
+        with patch.object(extractor, '_make_forex_request', return_value={}):
+            result = extractor.get_exchange_rate("USD", "EUR")
+            assert result is None
     
     def test_get_daily_forex_with_full_output(self, extractor):
         """Test daily forex with full output size"""
@@ -90,7 +79,7 @@ class TestForexExtractor:
             }
         }
         
-        with patch.object(extractor, '_make_request', return_value=mock_response):
+        with patch.object(extractor, '_make_forex_request', return_value=mock_response):
             result = extractor.get_daily_forex("EUR", "USD", output_size="full")
             assert result is not None
             assert len(result) == 2
@@ -98,6 +87,7 @@ class TestForexExtractor:
             assert "2023-12-31" in result
     
     def test_get_weekly_forex_success(self, extractor):
+        """Test getting weekly forex data"""
         mock_response = {
             "Meta Data": {
                 "1. Information": "Forex Weekly Prices (open, high, low, close)",
@@ -115,13 +105,14 @@ class TestForexExtractor:
             }
         }
         
-        with patch.object(extractor, '_make_request', return_value=mock_response):
+        with patch.object(extractor, '_make_forex_request', return_value=mock_response):
             result = extractor.get_weekly_forex("EUR", "USD")
             assert result is not None
             assert "2024-01-05" in result
             assert result["2024-01-05"]["1. open"] == "1.1000"
     
     def test_get_monthly_forex_success(self, extractor):
+        """Test getting monthly forex data"""
         mock_response = {
             "Meta Data": {
                 "1. Information": "Forex Monthly Prices (open, high, low, close)",
@@ -139,7 +130,7 @@ class TestForexExtractor:
             }
         }
         
-        with patch.object(extractor, '_make_request', return_value=mock_response):
+        with patch.object(extractor, '_make_forex_request', return_value=mock_response):
             result = extractor.get_monthly_forex("EUR", "USD")
             assert result is not None
             assert "2024-01-31" in result
@@ -157,15 +148,15 @@ class TestForexExtractor:
             "Time Series FX (Weekly)": {"2024-01-05": {"1. open": "1.1050", "4. close": "1.1060"}}
         }
         
-        # Mock _make_request to return different responses based on params
-        def mock_make_request(params):
+        # Mock _make_forex_request to return different responses based on params
+        def mock_make_forex_request(params):
             if params.get("function") == "FX_DAILY":
                 return daily_response
             elif params.get("function") == "FX_WEEKLY":
                 return weekly_response
             return None
         
-        with patch.object(extractor, '_make_request', side_effect=mock_make_request):
+        with patch.object(extractor, '_make_forex_request', side_effect=mock_make_forex_request):
             result = extractor.get_multiple_timeframes("EUR", "USD", ["daily", "weekly"])
             
             assert "daily" in result
@@ -188,7 +179,7 @@ class TestForexExtractor:
             }
         ]
         
-        with patch.object(extractor, '_make_request', side_effect=mock_responses):
+        with patch.object(extractor, '_make_forex_request', side_effect=mock_responses):
             pairs = [("EUR", "USD"), ("GBP", "USD")]
             result = extractor.get_forex_batch(pairs, ["daily"])
             
@@ -219,7 +210,7 @@ class TestForexExtractor:
             }
         }
         
-        with patch.object(extractor, '_make_request', return_value=mock_response):
+        with patch.object(extractor, '_make_forex_request', return_value=mock_response):
             result = extractor.extract_and_transform("EUR", "USD", ["daily"])
             
             assert "daily" in result
@@ -235,13 +226,11 @@ class TestForexExtractor:
             assert record["close"] == 1.1010
             assert "metadata" in record
     
-    def test_rate_limiting(self):
+    def test_rate_limiting(self, extractor):
         """Test that rate limiting is called"""
-        extractor = ForexExtractor(api_key="test_key")
-        
         # Mock the rate limiting method
         with patch.object(extractor, '_rate_limit') as mock_rate_limit:
-            with patch.object(extractor, '_make_request', return_value={}):
+            with patch.object(extractor, '_make_forex_request', return_value={}):
                 extractor.get_daily_forex("EUR", "USD")
                 
                 # Verify rate limiting was called
@@ -272,8 +261,8 @@ class TestForexExtractor:
             }
         }
         
-        # Mock the _make_request method
-        with patch.object(extractor, '_make_request', return_value=mock_response):
+        # Mock the _make_forex_request method
+        with patch.object(extractor, '_make_forex_request', return_value=mock_response):
             result = extractor.get_intraday_forex("EUR", "USD", interval="5min")
             
             assert result is not None

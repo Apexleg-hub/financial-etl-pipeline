@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import requests
 from .base_extractor import BaseExtractor
-from ..config.settings import settings
+from config.settings import settings
 from ..utils.logger import logger
 from ..utils.rate_limiter import RateLimitConfig, rate_limiter
 
@@ -49,6 +49,21 @@ class CryptoExtractor(BaseExtractor):
     @property
     def base_url(self) -> str:
         return self._base_url
+    
+    @property
+    def api_key(self) -> str:
+        """Get API key for the exchange"""
+        if self.exchange == "binance":
+            return self.api_key
+        elif self.exchange == "coinbase":
+            return self.api_key
+        else:
+            return ""
+    
+    def _parse_response(self, data: Dict[str, Any]) -> pd.DataFrame:
+        """Parse API response into DataFrame"""
+        # Base implementation - can be overridden if needed
+        return pd.DataFrame()
     
     def extract_klines(
         self,
@@ -356,4 +371,4 @@ class CryptoExtractor(BaseExtractor):
             "extracted_at": datetime.utcnow()
         }
         
-        return pd
+        return pd.DataFrame([ticker_data])

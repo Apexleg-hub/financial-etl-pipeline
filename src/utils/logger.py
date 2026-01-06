@@ -88,9 +88,9 @@ class StructuredLogger:
         """Log error message with structured data"""
         self._log_with_extra(logging.ERROR, message, kwargs, exc_info)
     
-    def warning(self, message: str, **kwargs):
+    def warning(self, message: str, exc_info: Optional[Exception] = None, **kwargs):
         """Log warning message with structured data"""
-        self._log_with_extra(logging.WARNING, message, kwargs)
+        self._log_with_extra(logging.WARNING, message, kwargs, exc_info)
     
     def debug(self, message: str, **kwargs):
         """Log debug message with structured data"""

@@ -5,7 +5,7 @@ from datetime import datetime
 from supabase import create_client, Client
 from tenacity import retry, stop_after_attempt, wait_exponential
 from ..utils.logger import logger
-from ..config.settings import settings
+from config.settings import settings
 from .data_models import BaseModel, PipelineMetadata
 
 
@@ -171,9 +171,11 @@ class SupabaseLoader:
                 except Exception as e:
                     logger.warning(
                         f"Failed to convert row to data model",
-                        exc_info=e,
-                        row_index=_,
-                        data_model=data_model_class.__name__
+                        exc_info=True,
+                        extra={
+                            "row_index": _,
+                            "data_model": data_model_class.__name__
+                        }
                     )
             
             # Get table name and conflict columns from Meta class
@@ -272,7 +274,7 @@ class SupabaseLoader:
         except Exception as e:
             logger.warning(
                 f"Failed to get last loaded date from {table_name}",
-                exc_info=e,
-                table=table_name
+                exc_info=True,
+                extra={"table": table_name}
             )
             return None

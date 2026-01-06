@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 import pandas as pd
 from datetime import datetime
 from src.extract.alpha_vantage import AlphaVantageExtractor
@@ -19,17 +19,12 @@ class TestAlphaVantageExtractor:
     def extractor(self):
         with patch('src.extract.alpha_vantage.settings') as mock_settings:
             mock_settings.alpha_vantage_api_key = "test_key"
-            mock_settings.load_config.return_value = {
-                "sources": {
-                    "alpha_vantage": {
-                        "base_url": "https://test.com",
-                        "endpoints": {},
-                        "rate_limit": 5,
-                        "retry_delay": 60
-                    }
-                }
-            }
-            return AlphaVantageExtractor()
+            
+            with patch('src.utils.rate_limiter.rate_limiter'):
+                # Create extractor instance and manually set required attributes
+                extractor = AlphaVantageExtractor()
+                # These are set by the __init__ but we ensure they're correct for testing
+                return extractor
     
     @patch('requests.Session.get')
     def test_extract_stock_daily_success(self, mock_get, extractor):
@@ -60,12 +55,179 @@ class TestAlphaVantageExtractor:
         assert result.iloc[0]['symbol'] == "AAPL"
         assert result.iloc[0]['close'] == 152.0
     
-    def test_parse_response_invalid(self, extractor):
-        """Test parsing invalid response"""
+    @patch('requests.Session.get')
+    def test_extract_stock_daily_multiple_records(self, mock_get, extractor):
+        """Test stock data extraction with multiple records"""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "Meta Data": {"2. Symbol": "GOOGL"},
+            "Time Series (Daily)": {
+                "2024-01-02": {
+                    "1. open": "140.0",
+                    "2. high": "145.0",
+                    "3. low": "139.0",
+                    "4. close": "143.0",
+                    "5. volume": "900000"
+                },
+                "2024-01-01": {
+                    "1. open": "138.0",
+                    "2. high": "143.0",
+                    "3. low": "137.0",
+                    "4. close": "142.0",
+                    "5. volume": "1000000"
+                }
+            }
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = extractor.extract_stock_daily("GOOGL")
+        
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+        assert all(result['symbol'] == "GOOGL")
+        assert result.iloc[0]['volume'] == 900000
+        assert result.iloc[1]['volume'] == 1000000
+    
+    @patch('requests.Session.get')
+    def test_extract_stock_daily_full_output(self, mock_get, extractor):
+        """Test stock data extraction with full output size"""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "Meta Data": {"2. Symbol": "MSFT"},
+            "Time Series (Daily)": {}
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = extractor.extract_stock_daily("MSFT", output_size="full")
+        
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 0
+    
+    def test_parse_response_daily_success(self, extractor):
+        """Test parsing daily response successfully"""
+        data = {
+            "Meta Data": {"2. Symbol": "AAPL"},
+            "Time Series (Daily)": {
+                "2024-01-01": {
+                    "1. open": "150.0",
+                    "2. high": "155.0",
+                    "3. low": "149.0",
+                    "4. close": "152.0",
+                    "5. volume": "1000000"
+                },
+                "2024-01-02": {
+                    "1. open": "152.0",
+                    "2. high": "157.0",
+                    "3. low": "151.0",
+                    "4. close": "155.0",
+                    "5. volume": "1100000"
+                }
+            }
+        }
+        
+        result = extractor._parse_response(data)
+        
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+        assert result.iloc[0]['symbol'] == "AAPL"
+        assert result.iloc[0]['close'] == 152.0
+        assert result.iloc[1]['close'] == 155.0
+        assert result.iloc[0]['open'] == 150.0
+        assert result.iloc[1]['open'] == 152.0
+    
+    def test_parse_response_intraday_60min(self, extractor):
+        """Test parsing intraday 60min response"""
+        data = {
+            "Time Series (60min)": {
+                "2024-01-01 16:00:00": {
+                    "1. open": "150.0",
+                    "2. high": "155.0",
+                    "3. low": "149.0",
+                    "4. close": "152.0",
+                    "5. volume": "500000"
+                },
+                "2024-01-01 15:00:00": {
+                    "1. open": "148.0",
+                    "2. high": "151.0",
+                    "3. low": "147.0",
+                    "4. close": "150.0",
+                    "5. volume": "450000"
+                }
+            }
+        }
+        
+        result = extractor._parse_response(data)
+        
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+        assert 'timestamp' in result.columns
+        assert result.iloc[0]['close'] == 152.0
+        assert result.iloc[1]['close'] == 150.0
+    
+    def test_parse_response_intraday_30min(self, extractor):
+        """Test parsing intraday 30min response"""
+        data = {
+            "Time Series (30min)": {
+                "2024-01-01 16:00:00": {
+                    "1. open": "150.5",
+                    "2. high": "151.0",
+                    "3. low": "150.0",
+                    "4. close": "150.75",
+                    "5. volume": "100000"
+                }
+            }
+        }
+        
+        result = extractor._parse_response(data)
+        
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
+        assert result.iloc[0]['close'] == 150.75
+        assert result.iloc[0]['volume'] == 100000
+    
+    def test_parse_response_invalid_error_message(self, extractor):
+        """Test parsing response with error message"""
         invalid_data = {"Error Message": "Invalid API call"}
         
         with pytest.raises(ValueError, match="API Error"):
             extractor._parse_response(invalid_data)
+    
+    def test_parse_response_invalid_format(self, extractor):
+        """Test parsing response with unexpected format"""
+        invalid_data = {
+            "Information": "Some info",
+            "Note": "Rate limit reached"
+        }
+        
+        with pytest.raises(ValueError, match="Unexpected response format"):
+            extractor._parse_response(invalid_data)
+    
+    def test_parse_response_empty_time_series(self, extractor):
+        """Test parsing response with empty time series"""
+        data = {
+            "Meta Data": {"2. Symbol": "TEST"},
+            "Time Series (Daily)": {}
+        }
+        
+        result = extractor._parse_response(data)
+        
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 0
+    
+    def test_api_key_property(self, extractor):
+        """Test API key property"""
+        with patch('src.extract.alpha_vantage.settings.alpha_vantage_api_key', "custom_key"):
+            assert extractor.api_key == "custom_key"
+    
+    def test_base_url_property(self, extractor):
+        """Test base URL property"""
+        assert extractor.base_url == "https://www.alphavantage.co/query"
+    
+    def test_source_name(self, extractor):
+        """Test source name attribute"""
+        assert extractor.source_name == "alpha_vantage"
 
 
 # Add this to run the test when executed directly

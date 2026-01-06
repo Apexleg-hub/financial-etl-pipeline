@@ -30,20 +30,20 @@ class BaseModel:
         if self.updated_at:
             data['updated_at'] = self.updated_at.isoformat()
         if self.source:
-            data['source'] = self.source.value
+            data['source'] = self.source.value if isinstance(self.source, DataSource) else self.source
         return data
 
 
 @dataclass
 class StockPrice(BaseModel):
     """Stock price data model"""
-    symbol: str
-    date: datetime
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
+    symbol: str = None
+    date: datetime = None
+    open: float = None
+    high: float = None
+    low: float = None
+    close: float = None
+    volume: int = None
     adj_close: Optional[float] = None
     dividend_amount: Optional[float] = None
     split_coefficient: Optional[float] = None
@@ -61,13 +61,13 @@ class StockPrice(BaseModel):
 @dataclass
 class ForexRate(BaseModel):
     """Forex rate data model"""
-    from_currency: str
-    to_currency: str
-    date: datetime
-    open: float
-    high: float
-    low: float
-    close: float
+    from_currency: str = None
+    to_currency: str = None
+    date: datetime = None
+    open: float = None
+    high: float = None
+    low: float = None
+    close: float = None
     
     class Meta:
         table_name = "forex_rates"
@@ -77,14 +77,14 @@ class ForexRate(BaseModel):
 @dataclass
 class CryptocurrencyPrice(BaseModel):
     """Cryptocurrency price data model"""
-    symbol: str
-    exchange: str
-    timestamp: datetime
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: float
+    symbol: str = None
+    exchange: str = None
+    timestamp: datetime = None
+    open: float = None
+    high: float = None
+    low: float = None
+    close: float = None
+    volume: float = None
     quote_volume: Optional[float] = None
     
     class Meta:
@@ -95,9 +95,9 @@ class CryptocurrencyPrice(BaseModel):
 @dataclass
 class EconomicIndicator(BaseModel):
     """Economic indicator data model"""
-    series_id: str
-    date: datetime
-    value: float
+    series_id: str = None
+    date: datetime = None
+    value: float = None
     realtime_start: Optional[datetime] = None
     realtime_end: Optional[datetime] = None
     
@@ -109,15 +109,15 @@ class EconomicIndicator(BaseModel):
 @dataclass
 class WeatherData(BaseModel):
     """Weather data model"""
-    location: str
-    latitude: float
-    longitude: float
-    timestamp: datetime
-    temperature: float
-    humidity: float
-    pressure: float
-    wind_speed: float
-    weather_condition: str
+    location: str = None
+    latitude: float = None
+    longitude: float = None
+    timestamp: datetime = None
+    temperature: float = None
+    humidity: float = None
+    pressure: float = None
+    wind_speed: float = None
+    weather_condition: str = None
     
     class Meta:
         table_name = "weather_data"
@@ -127,11 +127,11 @@ class WeatherData(BaseModel):
 @dataclass
 class SentimentData(BaseModel):
     """Sentiment data model"""
-    source: str
-    entity: str
-    timestamp: datetime
-    sentiment_score: float
-    confidence: float
+    source: str = None
+    entity: str = None
+    timestamp: datetime = None
+    sentiment_score: float = None
+    confidence: float = None
     raw_text: Optional[str] = None
     url: Optional[str] = None
     
@@ -143,15 +143,14 @@ class SentimentData(BaseModel):
 @dataclass
 class PipelineMetadata(BaseModel):
     """Pipeline execution metadata"""
-    pipeline_id: str
-    run_id: str
-    status: str
-    start_time: datetime
+    pipeline_id: str = None
+    run_id: str = None
+    status: str = None
+    start_time: datetime = None
     end_time: Optional[datetime] = None
     records_processed: int = 0
     records_failed: int = 0
     error_message: Optional[str] = None
-    source: Optional[str] = None
     
     class Meta:
         table_name = "pipeline_metadata"
