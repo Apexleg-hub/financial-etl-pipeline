@@ -77,7 +77,7 @@ A production-ready ETL (Extract, Transform, Load) pipeline for collecting, proce
 
 ##  Prerequisites
 
-- Python 3.9+
+- Python 3.12+
 - Docker & Docker Compose
 - API Keys for:
   - Alpha Vantage
@@ -153,7 +153,6 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 ### Start all services
 
 
-cd docker
 docker-compose up -d
 
 

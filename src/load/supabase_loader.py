@@ -25,6 +25,34 @@ class SupabaseLoader:
             logger.error("Failed to connect to Supabase", exc_info=e)
             raise
     
+    def _serialize_data(self, data: Union[Dict, List[Dict]]) -> Union[Dict, List[Dict]]:
+        """
+        Convert timestamps and datetime objects to ISO format strings for JSON serialization
+        
+        Args:
+            data: Dictionary or list of dictionaries to serialize
+        
+        Returns:
+            Serialized data with timestamps converted to ISO format
+        """
+        def serialize_value(value):
+            """Convert a single value to JSON-serializable format"""
+            if isinstance(value, pd.Timestamp):
+                return value.isoformat()
+            elif isinstance(value, datetime):
+                return value.isoformat()
+            elif isinstance(value, dict):
+                return {k: serialize_value(v) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [serialize_value(v) for v in value]
+            else:
+                return value
+        
+        if isinstance(data, list):
+            return [serialize_value(item) for item in data]
+        else:
+            return serialize_value(data)
+    
     @retry(
         stop=stop_after_attempt(settings.max_retries),
         wait=wait_exponential(multiplier=1, min=4, max=60)
@@ -75,8 +103,9 @@ class SupabaseLoader:
                 # Convert to DataFrame for validation
                 df_batch = pd.DataFrame(batch)
                 
-                # Prepare data for upsert
+                # Prepare data for upsert and serialize timestamps
                 upsert_data = df_batch.to_dict(orient='records')
+                upsert_data = self._serialize_data(upsert_data)
                 
                 # Execute upsert
                 response = self.client.table(table_name).upsert(
@@ -224,6 +253,8 @@ class SupabaseLoader:
         """Save pipeline metadata to database"""
         try:
             metadata_dict = metadata.to_dict()
+            # Serialize timestamps to ISO format
+            metadata_dict = self._serialize_data(metadata_dict)
             self.client.table("pipeline_metadata").insert(metadata_dict).execute()
             logger.info(
                 "Pipeline metadata saved",

@@ -70,7 +70,7 @@ class CryptoExtractor(BaseExtractor):
         symbol: str,
         interval: str = "1d",
         start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        ended_at: Optional[datetime] = None,
         limit: int = 1000
     ) -> pd.DataFrame:
         """
@@ -80,16 +80,16 @@ class CryptoExtractor(BaseExtractor):
             symbol: Trading pair (e.g., BTCUSDT, ETHUSDT)
             interval: Kline interval (1m, 5m, 15m, 1h, 4h, 1d, etc.)
             start_time: Start timestamp
-            end_time: End timestamp
+            ended_at: End timestamp
             limit: Number of klines to fetch
         
         Returns:
             DataFrame with kline data
         """
         if self.exchange == "binance":
-            return self._extract_binance_klines(symbol, interval, start_time, end_time, limit)
+            return self._extract_binance_klines(symbol, interval, start_time, ended_at, limit)
         elif self.exchange == "coinbase":
-            return self._extract_coinbase_candles(symbol, interval, start_time, end_time, limit)
+            return self._extract_coinbase_candles(symbol, interval, start_time, ended_at, limit)
         else:
             raise ValueError(f"Unsupported exchange for klines: {self.exchange}")
     
@@ -98,7 +98,7 @@ class CryptoExtractor(BaseExtractor):
         symbol: str,
         interval: str,
         start_time: Optional[datetime],
-        end_time: Optional[datetime],
+        ended_at: Optional[datetime],
         limit: int
     ) -> pd.DataFrame:
         """Extract klines from Binance"""
@@ -112,8 +112,8 @@ class CryptoExtractor(BaseExtractor):
         
         if start_time:
             params["startTime"] = int(start_time.timestamp() * 1000)
-        if end_time:
-            params["endTime"] = int(end_time.timestamp() * 1000)
+        if ended_at:
+            params["endTime"] = int(ended_at.timestamp() * 1000)
         
         logger.info(
             f"Extracting Binance klines for {symbol}",
@@ -164,7 +164,7 @@ class CryptoExtractor(BaseExtractor):
         symbol: str,
         interval: str,
         start_time: Optional[datetime],
-        end_time: Optional[datetime],
+        ended_at: Optional[datetime],
         limit: int
     ) -> pd.DataFrame:
         """Extract candles from Coinbase"""
@@ -189,8 +189,8 @@ class CryptoExtractor(BaseExtractor):
         
         if start_time:
             params["start"] = start_time.isoformat()
-        if end_time:
-            params["end"] = end_time.isoformat()
+        if ended_at:
+            params["end"] = ended_at.isoformat()
         
         logger.info(
             f"Extracting Coinbase candles for {symbol}",

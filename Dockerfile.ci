@@ -1,0 +1,52 @@
+
+
+# Multi-stage build for CI/CD
+FROM python:3.10-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+COPY requirements-dev.txt .
+
+# Install Python dependencies
+RUN pip install --user --no-cache-dir -r requirements.txt -r requirements-dev.txt
+
+# Runtime image
+FROM python:3.10-slim AS runtime
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python packages from builder
+COPY --from=builder /root/.local /root/.local
+
+# Make sure scripts in .local are usable
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy application
+COPY . .
+
+# Create non-root user
+RUN useradd -m -u 1000 etl_user && chown -R etl_user:etl_user /app
+USER etl_user
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -m src.cli health-check
+
+CMD ["python", "-m", "src.cli", "run"]

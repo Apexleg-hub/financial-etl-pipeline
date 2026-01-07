@@ -306,10 +306,10 @@ src/utils/rate_limiter.py (41 statements)
 ✅ Monitoring (Alert management):         100%
 ⚠️  Transformation (Data processing):      52%
 ⚠️  Utilities (Helper functions):          61%
-```
+
 
 ### By Complexity:
-```
+
 Simple Components (< 50 lines):
 ├── Initialization: 100%
 ├── Properties: 100%
@@ -322,17 +322,17 @@ Medium Components (50-150 lines):
 └── Alert handling: 100%
 
 Complex Components (> 150 lines):
-├── Data standardization: 12% ⚠️
-├── Data validation: 24% ⚠️
-├── Weather extraction: 63% ⚠️
-└── Forex extraction: 52% ⚠️
-```
+├── Data standardization: 12% 
+├── Data validation: 24% 
+├── Weather extraction: 63% 
+└── Forex extraction: 52% 
+
 
 ---
 
-## 🎯 Coverage Gaps - Priority List
+##  Coverage Gaps - Priority List
 
-### 🔴 **CRITICAL (Must Test)**
+###  **CRITICAL (Must Test)**
 
 1. **Data Standardizer (12% → Target: 80%)**
    - Impact: HIGH - Used for all data normalization
@@ -362,7 +362,7 @@ Complex Components (> 150 lines):
 
 ---
 
-### 🟡 **HIGH PRIORITY (Should Test)**
+###  **HIGH PRIORITY (Should Test)**
 
 4. **Forex Extractor (52% → Target: 85%)**
    - Impact: MEDIUM - Financial data source
@@ -392,7 +392,7 @@ Complex Components (> 150 lines):
 
 ---
 
-### 🟢 **MEDIUM PRIORITY (Nice to Have)**
+###  **MEDIUM PRIORITY (Nice to Have)**
 
 7. **Base Extractor (77% → Target: 90%)**
    - Impact: MEDIUM - Used by all extractors
@@ -418,10 +418,10 @@ Complex Components (> 150 lines):
 
 ---
 
-## 📝 Testing Recommendations
+##  Testing Recommendations
 
 ### Phase 1: Critical Path (1 week)
-```
+
 Priority 1: Data Standardizer
 ├── Currency conversion
 ├── Unit conversion
@@ -434,10 +434,10 @@ Priority 2: Data Validator
 
 Priority 3: Weather Utils
 └── All utility functions
-```
+
 
 ### Phase 2: High Impact (2 weeks)
-```
+
 Priority 4: Forex Extractor
 ├── Batch operations
 ├── Complex queries
@@ -449,24 +449,24 @@ Priority 5: Weather Extractor
 
 Priority 6: Crypto Extractor
 └── Edge case scenarios
-```
+
 
 ### Phase 3: Optimization (ongoing)
-```
+
 Priority 7-9: Base Extractor, Logger, Rate Limiter
 └── Edge cases and advanced features
-```
+
 
 ---
 
-## 🚀 Coverage Targets
+##  Coverage Targets
 
 ### Current State (200 tests, 57% coverage)
-```
-✅ EXCELLENT (>90%):  Load, Monitoring, Alpha Vantage, FRED
-✅ GOOD      (80-90%): Extract Base, Finnhub, Data Cleaner, Feature Engineer
-⚠️  ACCEPTABLE (50-80%): Logger, Rate Limiter, Crypto, Weather
-❌ POOR      (<50%):  Standardizer, Validator, Forex, Weather Utils
+
+EXCELLENT (>90%):  Load, Monitoring, Alpha Vantage, FRED
+GOOD      (80-90%): Extract Base, Finnhub, Data Cleaner, Feature Engineer
+ACCEPTABLE (50-80%): Logger, Rate Limiter, Crypto, Weather
+POOR      (<50%):  Standardizer, Validator, Forex, Weather Utils
 ```
 
 ### Target State (+ 150 additional tests)
@@ -480,7 +480,7 @@ Priority 7-9: Base Extractor, Logger, Rate Limiter
 
 ---
 
-## 📊 Coverage Metrics
+##  Coverage Metrics
 
 | Metric | Current | Target |
 |--------|---------|--------|
@@ -494,7 +494,7 @@ Priority 7-9: Base Extractor, Logger, Rate Limiter
 
 ---
 
-## ✅ What's Working Well
+## What's Working Well
 
 1. **Monitoring & Alerting**: 100% coverage - production-ready
 2. **Load Module**: 94% coverage - database layer solid
@@ -504,7 +504,7 @@ Priority 7-9: Base Extractor, Logger, Rate Limiter
 
 ---
 
-## ⚠️ What Needs Work
+##  What Needs Work
 
 1. **Data Standardization**: Only 12% tested - CRITICAL
 2. **Data Validation**: Only 24% tested - CRITICAL
@@ -514,7 +514,7 @@ Priority 7-9: Base Extractor, Logger, Rate Limiter
 
 ---
 
-## 🎓 Conclusion
+##  Conclusion
 
 Your ETL pipeline has **solid foundational test coverage (57%)** with **excellent coverage of critical components** (monitoring, load, core extractors). However, **data transformation and utility functions need significant testing improvements**.
 

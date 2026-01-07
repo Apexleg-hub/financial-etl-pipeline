@@ -4,6 +4,31 @@ sources:
     enabled: true
     api_key: ${ALPHA_VANTAGE_API_KEY}
     symbols: [AAPL, MSFT, GOOGL]
+  
+  finnhub:
+    enabled: true
+    api_key: ${FINNHUB_API_KEY}
+    symbols: [AAPL, MSFT, GOOGL]
+  
+  fred:
+    enabled: true
+    api_key: ${FRED_API_KEY}
+    indicators: [GDP, UNRATE, CPIAUCSL]
+  
+  weather:
+    enabled: true
+    api_key: ${OPENWEATHER_API_KEY}
+    cities: [New York, London, Tokyo]
+  
+  forex:
+    enabled: true
+    api_key: ${ALPHA_VANTAGE_API_KEY}
+    pairs:
+      - [EUR, USD]
+      - [GBP, USD]
+      - [USD, JPY]
+      - [USD, CHF]
+    timeframe: daily
 
 # Transformation rules
 transformation:

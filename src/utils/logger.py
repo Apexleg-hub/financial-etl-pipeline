@@ -4,8 +4,15 @@ import json
 from datetime import datetime
 from typing import Dict, Any, Optional
 import sys
-from config.settings import settings
+import os
 from datetime import datetime, timezone
+
+# Ensure the project root is in the path for imports
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from config.settings import settings
 
 class JSONFormatter(logging.Formatter):
     """Custom JSON formatter for structured logging"""

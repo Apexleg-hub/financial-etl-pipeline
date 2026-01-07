@@ -1,0 +1,29 @@
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etl-pipeline-ci-config
+data:
+  PYTHON_VERSION: "3.10"
+  ENVIRONMENT: "ci"
+  LOG_LEVEL: "DEBUG"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etl-pipeline-daily-test
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: ci-runner
+            image: your-registry/financial-etl-pipeline-ci:latest
+            envFrom:
+            - configMapRef:
+                name: etl-pipeline-ci-config
+            command: ["make", "ci-local"]
+          restartPolicy: OnFailure

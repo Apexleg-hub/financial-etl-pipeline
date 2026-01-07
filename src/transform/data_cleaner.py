@@ -13,6 +13,8 @@ class DataCleaner:
     def __init__(self):
         self.config = settings.load_config("sources")
         self.missing_threshold = self.config["transformation"]["missing_value_threshold"]
+        self.allow_anomalies = self.config["transformation"].get("allow_anomalies", False)
+        self.anomalies_as_warnings = self.config["transformation"].get("anomalies_as_warnings", False)
     
     def clean_dataframe(
         self,
@@ -52,12 +54,42 @@ class DataCleaner:
         is_valid, errors = self._validate_data(df_clean, schema, source)
         
         if not is_valid:
-            logger.error(
-                f"Data validation failed for {source}",
-                source=source,
-                errors=errors
-            )
-            raise ValueError(f"Data validation failed: {errors}")
+            # Separate anomaly errors from other critical errors
+            anomaly_errors = [e for e in errors if "Anomalies detected" in e]
+            critical_errors = [e for e in errors if "Anomalies detected" not in e]
+            
+            # If we have anomalies and allow_anomalies is True, log as warning and continue
+            if anomaly_errors and self.allow_anomalies:
+                if self.anomalies_as_warnings:
+                    for error in anomaly_errors:
+                        logger.warning(
+                            f"Anomaly detected but processing continues: {error}",
+                            source=source,
+                            anomaly_error=error
+                        )
+                else:
+                    logger.info(
+                        f"Found anomalies but processing allowed: {anomaly_errors}",
+                        source=source,
+                        anomaly_count=len(anomaly_errors)
+                    )
+                
+                # If there are critical errors (not anomalies), fail
+                if critical_errors:
+                    logger.error(
+                        f"Data validation failed for {source}",
+                        source=source,
+                        critical_errors=critical_errors
+                    )
+                    raise ValueError(f"Data validation failed: {critical_errors}")
+            else:
+                # No allow_anomalies flag or no anomalies - fail on any error
+                logger.error(
+                    f"Data validation failed for {source}",
+                    source=source,
+                    errors=errors
+                )
+                raise ValueError(f"Data validation failed: {errors}")
         
         logger.info(
             f"Data cleaning completed for {source}",

@@ -45,4 +45,8 @@ extraction:
 transformation:
   missing_value_threshold: 0.1
   anomaly_zscore_threshold: 3.0
+  # Allow processing data with anomalies instead of failing completely
+  allow_anomalies: true
+  # When allow_anomalies is true, only log warnings instead of errors
+  anomalies_as_warnings: true
   default_currency: "USD"

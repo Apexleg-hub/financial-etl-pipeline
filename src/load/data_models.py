@@ -68,10 +68,35 @@ class ForexRate(BaseModel):
     high: float = None
     low: float = None
     close: float = None
+    volume: Optional[int] = None  # Added volume support
     
     class Meta:
         table_name = "forex_rates"
         unique_constraint = ["from_currency", "to_currency", "date"]
+
+
+@dataclass
+class ForexRateMT5(BaseModel):
+    """MT5 Forex rate data model with precise timestamps and volume"""
+    from_currency: str = None
+    to_currency: str = None
+    timestamp: datetime = None  # More precise than date
+    open: float = None
+    high: float = None
+    low: float = None
+    close: float = None
+    volume: int = None  # Tick volume from MT5
+    real_volume: Optional[int] = None  # Real volume if available
+    timeframe: str = None  # M1, M5, M15, M30, H1, H4, D1, W1, MN1
+    broker: Optional[str] = None  # Broker name (IC Markets, etc)
+    account_type: Optional[str] = None  # Real, Demo, Backtest
+    is_bid: bool = False  # Bid prices vs ask prices
+    tick_count: Optional[int] = None  # Number of ticks
+    
+    class Meta:
+        table_name = "forex_mt5"
+        unique_constraint = ["from_currency", "to_currency", "timestamp", "timeframe", "broker"]
+
 
 
 @dataclass

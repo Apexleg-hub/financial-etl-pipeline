@@ -195,10 +195,20 @@ class TestAlphaVantageExtractor:
             extractor._parse_response(invalid_data)
     
     def test_parse_response_invalid_format(self, extractor):
+        """Test parsing response with rate limit (Information key)"""
+        from src.extract.alpha_vantage import RateLimitError
+        
+        rate_limit_data = {
+            "Information": "Thank you for using Alpha Vantage! Our standard API call frequency is 5 calls per minute."
+        }
+        
+        with pytest.raises(RateLimitError, match="Rate limited by Alpha Vantage"):
+            extractor._parse_response(rate_limit_data)
+    
+    def test_parse_response_unexpected_format(self, extractor):
         """Test parsing response with unexpected format"""
         invalid_data = {
-            "Information": "Some info",
-            "Note": "Rate limit reached"
+            "SomeKey": "SomeValue"
         }
         
         with pytest.raises(ValueError, match="Unexpected response format"):

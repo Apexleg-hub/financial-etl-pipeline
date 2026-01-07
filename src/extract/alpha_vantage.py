@@ -3,9 +3,15 @@
 import pandas as pd
 from typing import Dict, Any, Optional
 from datetime import datetime
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from .base_extractor import BaseExtractor
 from config.settings import settings
 from ..utils.logger import logger
+
+
+class RateLimitError(Exception):
+    """Exception raised when API rate limit is hit"""
+    pass
 
 
 class AlphaVantageExtractor(BaseExtractor):
@@ -34,6 +40,12 @@ class AlphaVantageExtractor(BaseExtractor):
     def base_url(self) -> str:
         return self._base_url
     
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=4, max=300),
+        retry=retry_if_exception_type(RateLimitError),
+        reraise=True
+    )
     def extract_stock_daily(
         self,
         symbol: str,
@@ -60,6 +72,15 @@ class AlphaVantageExtractor(BaseExtractor):
     
     def _parse_response(self, data: Dict[str, Any]) -> pd.DataFrame:
         """Parse Alpha Vantage response"""
+        # Detect rate limit response (API returns Information key when rate limited)
+        if "Information" in data:
+            message = data["Information"]
+            logger.warning(
+                f"Alpha Vantage rate limit hit: {message}",
+                message=message
+            )
+            raise RateLimitError(f"Rate limited by Alpha Vantage: {message}")
+        
         if "Error Message" in data:
             raise ValueError(f"API Error: {data['Error Message']}")
         
