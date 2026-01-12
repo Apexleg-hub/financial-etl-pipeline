@@ -1,8 +1,9 @@
+# src/extract/mt5.py
 """
-MT5 Forex Data Extractor
+MT5 Forex Data Extractor - Strategic Timeframes Only (D1, W1, MN1)
 
-Extracts forex data from MetaTrader 5 with precise timestamp and volume information.
-Supports multiple timeframes (M1, M5, M15, M30, H1, H4, D1, W1, MN1).
+Extracts daily, weekly, and monthly forex data from MetaTrader 5.
+Optimized for long-term analysis and strategic trading decisions.
 
 Requirements:
     pip install MetaTrader5
@@ -12,11 +13,12 @@ Setup Instructions:
     2. Launch MT5 terminal (application must be running)
     3. Configure broker and account in MT5
     4. Use this extractor to pull historical data
+    Note: Only strategic timeframes (D1, W1, MN1) are supported.
 """
 
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Any
 from datetime import datetime, timedelta, timezone
-import logging
+import pandas as pd
 from dataclasses import dataclass
 
 try:
@@ -25,6 +27,7 @@ except ImportError:
     mt5 = None
 
 from src.extract.base_extractor import BaseExtractor
+from src.utils.logger import logger
 
 
 @dataclass
@@ -39,37 +42,35 @@ class MT5Config:
 
 class MT5Extractor(BaseExtractor):
     """
-    Extract forex data from MetaTrader 5.
+    Extract forex data from MetaTrader 5 - Strategic Timeframes Only.
+    
+    Supported Timeframes:
+    - D1: Daily candles
+    - W1: Weekly candles
+    - MN1: Monthly candles
     
     MT5 provides:
     - Tick volume (available on all brokers)
     - Real volume (institutional brokers only)
-    - Multiple timeframes (M1 through MN1)
     - Precise timestamps (down to seconds)
     
     Usage:
         extractor = MT5Extractor(
             pairs=[('EUR', 'USD'), ('GBP', 'USD')],
-            timeframe='H1',
+            timeframe='D1',  # Only D1, W1, or MN1 allowed
             broker='IC Markets'
         )
         data = extractor.extract_historical(
             symbol='EURUSD',
-            days_back=30
+            days_back=365
         )
     """
     
-    # MT5 Timeframe Mapping
+    # MT5 Timeframe Mapping - STRATEGIC TIMEFRAMES ONLY
     TIMEFRAME_MAP = {
-        'M1': mt5.TIMEFRAME_M1 if mt5 else 1,
-        'M5': mt5.TIMEFRAME_M5 if mt5 else 5,
-        'M15': mt5.TIMEFRAME_M15 if mt5 else 15,
-        'M30': mt5.TIMEFRAME_M30 if mt5 else 30,
-        'H1': mt5.TIMEFRAME_H1 if mt5 else 60,
-        'H4': mt5.TIMEFRAME_H4 if mt5 else 240,
-        'D1': mt5.TIMEFRAME_D1 if mt5 else 1440,
-        'W1': mt5.TIMEFRAME_W1 if mt5 else 10080,
-        'MN1': mt5.TIMEFRAME_MN1 if mt5 else 43200,
+        "D1": mt5.TIMEFRAME_D1 if mt5 else 1440,
+        "W1": mt5.TIMEFRAME_W1 if mt5 else 10080,
+        "MN1": mt5.TIMEFRAME_MN1 if mt5 else 43200,
     }
     
     def __init__(
@@ -78,19 +79,22 @@ class MT5Extractor(BaseExtractor):
         timeframe: str = 'D1',
         broker: Optional[str] = None,
         config: Optional[MT5Config] = None,
-        logger: Optional[logging.Logger] = None,
     ):
         """
         Initialize MT5 extractor.
         
         Args:
             pairs: List of (from_currency, to_currency) tuples. Example: [('EUR', 'USD')]
-            timeframe: Candle timeframe: M1, M5, M15, M30, H1, H4, D1, W1, MN1
+            timeframe: Candle timeframe - MUST be one of: D1, W1, MN1
             broker: Broker name for reference (e.g., 'IC Markets')
             config: MT5Config object for connection details
-            logger: Logger instance
+            
+        Raises:
+            ImportError: If MetaTrader5 module not installed
+            ValueError: If invalid timeframe specified
         """
-        super().__init__(logger)
+        # Initialize base class with source name
+        super().__init__(source_name="mt5")
         
         if mt5 is None:
             raise ImportError(
@@ -103,11 +107,41 @@ class MT5Extractor(BaseExtractor):
         self.broker = broker or "MT5"
         self.config = config or MT5Config()
         
+        # Validate timeframe - ONLY strategic timeframes allowed
         if timeframe not in self.TIMEFRAME_MAP:
-            raise ValueError(f"Invalid timeframe: {timeframe}. Must be one of {list(self.TIMEFRAME_MAP.keys())}")
+            raise ValueError(
+                f"Only strategic timeframes allowed: {list(self.TIMEFRAME_MAP.keys())}. "
+                f"Got: {timeframe}"
+            )
         
         self._connected = False
         self._connect()
+    
+    # Required properties from BaseExtractor
+    @property
+    def api_key(self) -> str:
+        """MT5 doesn't use API keys, return empty string"""
+        return ""
+    
+    @property
+    def base_url(self) -> str:
+        """MT5 doesn't use HTTP, return empty string"""
+        return ""
+    
+    def _parse_response(self, data: Dict[str, Any]) -> pd.DataFrame:
+        """
+        Parse MT5 response into DataFrame
+        
+        Note: This is required by BaseExtractor but MT5 doesn't use
+        JSON responses. This method is here for interface compliance.
+        
+        Args:
+            data: Response data (not used for MT5)
+            
+        Returns:
+            Empty DataFrame
+        """
+        return pd.DataFrame()
     
     def _connect(self) -> bool:
         """
@@ -126,93 +160,209 @@ class MT5Extractor(BaseExtractor):
                 timeout=self.config.timeout
             ):
                 error = mt5.last_error()
-                self.logger.error(f"MT5 initialization failed: {error}")
+                logger.error(
+                    f"MT5 initialization failed: {error}",
+                    source="mt5",
+                    error_code=error[0] if error else None
+                )
                 return False
             
             self._connected = True
-            self.logger.info("Connected to MT5 terminal successfully")
+            logger.info(
+                "Connected to MT5 terminal successfully",
+                source="mt5",
+                broker=self.broker
+            )
             return True
             
         except Exception as e:
-            self.logger.error(f"MT5 connection error: {str(e)}")
+            logger.error(
+                f"MT5 connection error: {str(e)}",
+                exc_info=e,
+                source="mt5"
+            )
             return False
+    
+    def _normalize_start_date(self, start_date: datetime) -> datetime:
+        """
+        Normalize start date based on timeframe to align with candle boundaries
+        
+        Args:
+            start_date: Original start date
+            
+        Returns:
+            Normalized start date aligned to timeframe boundary
+        """
+        if self.timeframe == "D1":
+            # Start at beginning of day (00:00:00)
+            return start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        elif self.timeframe == "W1":
+            # Start at beginning of week (Monday 00:00:00)
+            days_to_monday = start_date.weekday()
+            start_date = start_date - timedelta(days=days_to_monday)
+            return start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        elif self.timeframe == "MN1":
+            # Start at beginning of month (1st day, 00:00:00)
+            return start_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        else:
+            # Should never reach here due to validation in __init__
+            return start_date
     
     def extract_historical(
         self,
         symbol: str,
-        days_back: int = 30,
+        days_back: int = 365,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-    ) -> List[Dict]:
-        """
-        Extract historical forex data from MT5.
-        
-        Args:
-            symbol: MT5 symbol (e.g., 'EURUSD', 'GBPUSD')
-            days_back: Number of days back to fetch (alternative to start_date)
-            start_date: Start date for data extraction (UTC)
-            end_date: End date for data extraction (UTC, default: now)
-            
-        Returns:
-            List of dictionaries with OHLCV data
-            
-        Example:
-            data = extractor.extract_historical('EURUSD', days_back=30)
-            # Returns:
-            # [
-            #     {
-            #         'symbol': 'EURUSD',
-            #         'timestamp': datetime(2026, 1, 7, 12, 0, 0, tzinfo=UTC),
-            #         'open': 1.08520,
-            #         'high': 1.08620,
-            #         'low': 1.08480,
-            #         'close': 1.08590,
-            #         'volume': 45320,
-            #         'timeframe': 'H1'
-            #     },
-            #     ...
-            # ]
-        """
+        ) -> List[Dict]:
+
+        # ------------------------------------------------------------------
+        # 1. Enforce configured trading universe
+        # ------------------------------------------------------------------
+        allowed_symbols = {self._symbol_from_pair(*p) for p in self.pairs}
+        if symbol not in allowed_symbols:
+            raise ValueError(f"Symbol {symbol} not in configured pairs")
+
+    # ------------------------------------------------------------------
+    # 2. Enforce supported timeframes (D1, W1, MN1 only)
+    # ------------------------------------------------------------------
+        if self.timeframe not in {"D1", "W1", "MN1"}:
+            raise ValueError("Only D1, W1 and MN1 timeframes are allowed for ETL")
+
+    # ------------------------------------------------------------------
+    # 3. Connection validation
+    # ------------------------------------------------------------------
         if not self._connected:
-            self.logger.error("Not connected to MT5")
+            self.logger.error("Not connected to MT5", extra={"source": "mt5"})
             raise RuntimeError("MT5 connection not established")
-        
-        try:
-            # Calculate date range
-            if end_date is None:
-                end_date = datetime.now(timezone.utc)
-            
-            if start_date is None:
-                start_date = end_date - timedelta(days=days_back)
-            
-            self.logger.info(
-                f"Fetching {symbol} from {start_date} to {end_date} "
-                f"(timeframe: {self.timeframe})"
-            )
+
+    # ------------------------------------------------------------------
+    # 4. Resolve date range
+    # ------------------------------------------------------------------
+        if end_date is None:
+            end_date = datetime.now(timezone.utc)
+
+        if start_date is None:
+           start_date = end_date - timedelta(days=days_back)
+
+        # Normalize to candle boundary
+        start_date = self._normalize_start_date(start_date)
+
+    # ------------------------------------------------------------------
+    # 5. Ensure symbol is available in MT5
+    # ------------------------------------------------------------------
+        if not mt5.symbol_select(symbol, True):
+           raise ValueError(f"Symbol not available in MT5: {symbol}")
+
+        self.logger.info(
+        "Starting MT5 historical extraction",
+            extra={
+                "source": "mt5",
+                "symbol": symbol,
+                "timeframe": self.timeframe,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                },
+                )
+
+            # ------------------------------------------------------------------
+            # 6. Fetch candles
+            # ------------------------------------------------------------------
+        rates = mt5.copy_rates_range(
+                symbol,
+                self.TIMEFRAME_MAP[self.timeframe],
+                start_date,
+                end_date,
+             )
+        if rates is None or len(rates) == 0:
+                self.logger.warning(
+                "No candles returned from MT5",
+            extra={"source": "mt5", "symbol": symbol},
+                )
+        return []
+
+            # ------------------------------------------------------------------
+            # 7. Parse into warehouse-grade records
+            # ------------------------------------------------------------------
+        from_ccy, to_ccy = self._parse_symbol(symbol)
+        result = []
+
+        for r in rates:
+                result.append({
+                "source": "MT5",
+               "broker": self.broker,
+                "symbol": symbol,
+                "from_currency": from_ccy,
+                "to_currency": to_ccy,
+                "timeframe": self.timeframe,
+                "timestamp": datetime.fromtimestamp(int(r[0]), tz=timezone.utc),
+
+                # OHLC
+                "open": float(r[1]),
+                "high": float(r[2]),
+                "low": float(r[3]),
+                "close": float(r[4]),
+
+                # Volumes (properly separated)
+                "tick_volume": int(r[5]),
+                "real_volume": int(r[7]) if len(r) > 7 and r[7] > 0 else None,
+                })
+
+        self.logger.info(
+            "MT5 extraction completed",
+        extra={
+            "source": "mt5",
+            "symbol": symbol,
+            "rows": len(result),
+            "timeframe": self.timeframe,
+          },
+           )
+
+        return result
+
             
             # Get MT5 timeframe constant
-            mt5_timeframe = self.TIMEFRAME_MAP[self.timeframe]
+        mt5_timeframe = self.TIMEFRAME_MAP[self.timeframe]
+            
+            # Ensure symbol is available in MT5
+        if not mt5.symbol_select(symbol, True):
+                error_msg = f"Symbol not available in MT5: {symbol}"
+                logger.error(error_msg, source="mt5", symbol=symbol)
+                raise ValueError(error_msg)
             
             # Fetch rates from MT5
-            rates = mt5.copy_rates_range(
+        rates = mt5.copy_rates_range(
                 symbol,
                 mt5_timeframe,
                 start_date,
                 end_date
             )
             
-            if rates is None:
+            # Handle no data scenario
+        if rates is None:
                 error = mt5.last_error()
-                self.logger.warning(f"No data for {symbol}: {error}")
+                logger.warning(
+                    f"No data returned for {symbol}: {error}",
+                    source="mt5",
+                    symbol=symbol,
+                    error_code=error[0] if error else None
+                )
                 return []
             
-            if len(rates) == 0:
-                self.logger.warning(f"Empty result for {symbol}")
+        if len(rates) == 0:
+                logger.warning(
+                    f"Empty result for {symbol}",
+                    source="mt5",
+                    symbol=symbol
+                )
                 return []
             
             # Parse MT5 rates into our format
-            result = []
-            for rate in rates:
+        result = []
+        for rate in rates:
                 from_ccy, to_ccy = self._parse_symbol(symbol)
                 
                 result.append({
@@ -224,78 +374,30 @@ class MT5Extractor(BaseExtractor):
                     'high': float(rate[2]),
                     'low': float(rate[3]),
                     'close': float(rate[4]),
-                    'volume': int(rate[5]),  # Tick volume
+                    'tick_volume': int(rate[5]),
+                    'real_volume': int(rate[7]) if len(rate) > 7 and rate[7] > 0 else None,
                     'timeframe': self.timeframe,
                     'broker': self.broker,
+                     'source': 'MT5'
                 })
             
-            self.logger.info(f"Successfully extracted {len(result)} candles for {symbol}")
-            return result
+        logger.info(
+                f"Successfully extracted {len(result)} candles for {symbol}",
+                source="mt5",
+                symbol=symbol,
+                candle_count=len(result),
+                timeframe=self.timeframe
+            )
+        return result
             
         except Exception as e:
-            self.logger.error(f"Error extracting data for {symbol}: {str(e)}")
-            raise
-    
-    def extract_realtime(
-        self,
-        symbols: Optional[List[str]] = None,
-        interval_seconds: int = 60,
-        max_iterations: Optional[int] = None,
-    ) -> List[Dict]:
-        """
-        Extract real-time tick data from MT5 (streaming).
-        
-        Args:
-            symbols: List of symbols to monitor (default: all pairs)
-            interval_seconds: Polling interval
-            max_iterations: Maximum number of polls (None = infinite)
-            
-        Yields:
-            Dictionary with latest tick data
-            
-        Example:
-            extractor = MT5Extractor(pairs=[('EUR', 'USD')])
-            for tick in extractor.extract_realtime(['EURUSD'], max_iterations=100):
-                print(f"EUR/USD: {tick['bid']}/{tick['ask']}")
-        """
-        if not self._connected:
-            raise RuntimeError("MT5 connection not established")
-        
-        symbols = symbols or [self._symbol_from_pair(*pair) for pair in self.pairs]
-        iteration = 0
-        
-        try:
-            while max_iterations is None or iteration < max_iterations:
-                for symbol in symbols:
-                    tick = mt5.symbol_info_tick(symbol)
-                    
-                    if tick is None:
-                        self.logger.warning(f"Could not get tick for {symbol}")
-                        continue
-                    
-                    from_ccy, to_ccy = self._parse_symbol(symbol)
-                    
-                    yield {
-                        'symbol': symbol,
-                        'from_currency': from_ccy,
-                        'to_currency': to_ccy,
-                        'timestamp': datetime.fromtimestamp(tick.time, tz=timezone.utc),
-                        'bid': float(tick.bid),
-                        'ask': float(tick.ask),
-                        'bid_volume': int(tick.bid_volume),
-                        'ask_volume': int(tick.ask_volume),
-                        'last': float(tick.last),
-                        'volume': int(tick.volume),
-                        'broker': self.broker,
-                    }
-                
-                iteration += 1
-                
-        except KeyboardInterrupt:
-            self.logger.info("Real-time extraction interrupted by user")
-        except Exception as e:
-            self.logger.error(f"Error in real-time extraction: {str(e)}")
-            raise
+        logger.error(
+                f"Error extracting data for {symbol}: {str(e)}",
+                exc_info=e,
+                source="mt5",
+                symbol=symbol
+            )
+        raise
     
     def get_symbol_info(self, symbol: str) -> Dict:
         """
@@ -312,7 +414,11 @@ class MT5Extractor(BaseExtractor):
         
         info = mt5.symbol_info(symbol)
         if info is None:
-            self.logger.error(f"Symbol not found: {symbol}")
+            logger.error(
+                f"Symbol not found: {symbol}",
+                source="mt5",
+                symbol=symbol
+            )
             return {}
         
         return {
@@ -322,8 +428,7 @@ class MT5Extractor(BaseExtractor):
             'digits': info.digits,  # Decimal places
             'bid': info.bid,
             'ask': info.ask,
-            'bid_volume': info.bid_volume,
-            'ask_volume': info.ask_volume,
+            'volume': info.volume,
             'last_price': info.last,
             'min_volume': info.volume_min,
             'max_volume': info.volume_max,
@@ -368,14 +473,11 @@ class MT5Extractor(BaseExtractor):
     
     def disconnect(self):
         """Disconnect from MT5 terminal."""
-        if mt5:
+        if mt5 and self._connected:
             mt5.shutdown()
             self._connected = False
-            self.logger.info("Disconnected from MT5")
+            logger.info("Disconnected from MT5", source="mt5")
     
-    def __del__(self):
-        """Cleanup: disconnect on object deletion."""
-        self.disconnect()
 
 
 # Example Usage
@@ -384,33 +486,54 @@ if __name__ == "__main__":
     
     # Setup logging
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
+    local_logger = logging.getLogger(__name__)
     
     try:
-        # Initialize extractor
+        # Initialize extractor with DAILY data
         extractor = MT5Extractor(
             pairs=[('EUR', 'USD'), ('GBP', 'USD'), ('USD', 'JPY')],
-            timeframe='H1',
+            timeframe='D1',  # Daily candles
             broker='IC Markets',
         )
         
-        # Extract historical data
-        logger.info("Extracting historical data...")
-        data = extractor.extract_historical('EURUSD', days_back=7)
+        # Extract 1 year of daily data
+        local_logger.info("Extracting 1 year of daily data...")
+        data = extractor.extract_historical('EURUSD', days_back=365)
         
         if data:
-            print(f"\nExtracted {len(data)} candles:")
+            print(f"\nExtracted {len(data)} daily candles:")
             for candle in data[:5]:  # Show first 5
-                print(f"  {candle['timestamp']}: O={candle['open']:.5f} "
-                      f"H={candle['high']:.5f} L={candle['low']:.5f} "
-                      f"C={candle['close']:.5f} V={candle['volume']}")
+                print(f"  {candle['timestamp'].date()}: "
+                      f"O={candle['open']:.5f} "
+                      f"H={candle['high']:.5f} "
+                      f"L={candle['low']:.5f} "
+                      f"C={candle['close']:.5f} "
+                      f"V={candle['volume']}")
         
         # Get symbol info
-        logger.info("\nFetching symbol information...")
+        local_logger.info("\nFetching symbol information...")
         info = extractor.get_symbol_info('EURUSD')
-        print(f"Symbol info: {info}")
+        print(f"\nSymbol info: {info}")
         
+        # Test weekly data
+        extractor_weekly = MT5Extractor(
+            pairs=[('EUR', 'USD')],
+            timeframe='W1',  # Weekly candles
+            broker='IC Markets',
+        )
+        
+        local_logger.info("\nExtracting 1 year of weekly data...")
+        weekly_data = extractor_weekly.extract_historical('EURUSD', days_back=365)
+        print(f"\nExtracted {len(weekly_data)} weekly candles")
+        
+    except ValueError as e:
+        local_logger.error(f"Configuration error: {str(e)}")
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        local_logger.error(f"Error: {str(e)}")
     finally:
-        extractor.disconnect()
+        try:
+            extractor.disconnect()
+            if 'extractor_weekly' in locals():
+                extractor_weekly.disconnect()
+        except:
+            pass

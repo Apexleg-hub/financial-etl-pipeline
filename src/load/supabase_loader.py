@@ -37,7 +37,10 @@ class SupabaseLoader:
         """
         def serialize_value(value):
             """Convert a single value to JSON-serializable format"""
-            if isinstance(value, pd.Timestamp):
+            # Handle NaN and None values
+            if pd.isna(value):
+                return None
+            elif isinstance(value, pd.Timestamp):
                 return value.isoformat()
             elif isinstance(value, datetime):
                 return value.isoformat()
@@ -220,7 +223,7 @@ class SupabaseLoader:
             
             # Update pipeline metadata
             metadata.status = "completed"
-            metadata.end_time = datetime.utcnow()
+            metadata.ended_at = datetime.utcnow()
             metadata.records_processed = load_results["inserted"]
             metadata.records_failed = load_results["failed"]
             
@@ -243,7 +246,7 @@ class SupabaseLoader:
             
             # Update metadata with error
             metadata.status = "failed"
-            metadata.end_time = datetime.utcnow()
+            metadata.ended_at = datetime.utcnow()
             metadata.error_message = str(e)
             self._save_pipeline_metadata(metadata)
             

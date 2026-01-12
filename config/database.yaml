@@ -198,7 +198,7 @@ schemas:
             type: "varchar(20)"
           - name: "start_time"
             type: "timestamptz"
-          - name: "end_time"
+          - name: "ended_at"
             type: "timestamptz"
           - name: "duration_seconds"
             type: "integer"

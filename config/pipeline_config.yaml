@@ -52,5 +52,5 @@ loading:
 # Schedules (cron)
 schedules:
   market_data_daily:
-    cron: "0 1 * * *"  # 1 AM daily
+    cron: "0 12 * * *"  # 12 PM daily
     timezone: UTC

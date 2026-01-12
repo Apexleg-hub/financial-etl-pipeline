@@ -5,9 +5,6 @@ Automatically runs the financial ETL pipeline on a schedule using APScheduler.
 
 Installation:
     pip install APScheduler
-
-Usage:
-    python scheduler.py
 """
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -54,11 +51,11 @@ def run_etl_pipeline(pipeline_type: str = "all"):
         )
         
         if result.returncode == 0:
-            logger.info(f"✓ {pipeline_type.upper()} ETL completed successfully")
+            logger.info(f"[OK] {pipeline_type.upper()} ETL completed successfully")
             if result.stdout:
                 logger.info(f"Output:\n{result.stdout}")
         else:
-            logger.error(f"✗ {pipeline_type.upper()} ETL failed")
+            logger.error(f"[FAILED] {pipeline_type.upper()} ETL failed")
             logger.error(f"Error output:\n{result.stderr}")
             
     except subprocess.TimeoutExpired:
@@ -142,7 +139,7 @@ def schedule_pipelines():
     
     # Print scheduled jobs
     for job in scheduler.get_jobs():
-        logger.info(f"✓ Scheduled: {job.name}")
+        logger.info(f"[SCHEDULED] {job.name}")
         logger.info(f"  ID: {job.id}")
         logger.info(f"  Trigger: {job.trigger}")
         logger.info("")

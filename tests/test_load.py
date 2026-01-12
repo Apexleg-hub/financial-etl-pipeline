@@ -220,7 +220,7 @@ class TestDataModels:
             run_id="run_001",
             status="completed",
             start_time=start_time,
-            end_time=start_time + timedelta(minutes=5)
+            ended_at=start_time + timedelta(minutes=5)
         )
         
         assert metadata.pipeline_id == "stock_pipeline"

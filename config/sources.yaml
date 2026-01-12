@@ -1,15 +1,24 @@
 sources:
   alpha_vantage:
     base_url: "https://www.alphavantage.co/query"
+    api_key: "VNO71PDZPWJLDG0M"
+    
     endpoints:
       time_series_daily: "function=TIME_SERIES_DAILY"
-      time_series_intraday: "function=TIME_SERIES_INTRADAY"
-      forex_daily: "function=FX_DAILY"
+      time_series_weekly: "function=TIME_SERIES_WEEKLY"
+      time_series_monthly: "function=TIME_SERIES_MONTHLY"
     rate_limit: 5  # requests per minute
     retry_delay: 60  # seconds
 
- 
-    
+  mt5:
+    base_url: "mt5://localhost:1443"
+    endpoints:
+      time_series_daily: "function=TIME_SERIES_DAILY"
+      time_series_weekly: "function=TIME_SERIES_WEEKLY"
+      time_series_monthly: "function=TIME_SERIES_MONTHLY"
+    rate_limit: 5  # requests per minute
+    retry_delay: 60  # seconds
+
   finnhub:
     base_url: "https://finnhub.io/api/v1"
     endpoints:

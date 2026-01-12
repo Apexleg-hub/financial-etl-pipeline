@@ -114,7 +114,7 @@ def setup_task_scheduler():
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 0:
-            print("\n✅ SUCCESS: Task created successfully!")
+            print("\n[SUCCESS] Task created successfully!")
             print("\nTask Details:")
             print("  Name: ETL Pipeline Scheduler")
             print("  Triggers:")
@@ -134,7 +134,7 @@ def setup_task_scheduler():
             print("1. Verify the task:")
             print("   schtasks /query /tn 'ETL Pipeline Scheduler' /v")
             print("\n2. View scheduled tasks:")
-            print("   Open Task Scheduler (taskmgr) → Task Scheduler Library")
+            print("   Open Task Scheduler (taskmgr) -> Task Scheduler Library")
             print("\n3. Run immediately (for testing):")
             print("   schtasks /run /tn 'ETL Pipeline Scheduler'")
             print("\n4. To remove the task:")
@@ -142,13 +142,13 @@ def setup_task_scheduler():
             print("=" * 70)
             
         else:
-            print(f"\n❌ FAILED: {result.stderr}")
+            print(f"\n[FAILED] {result.stderr}")
             # Clean up
             if os.path.exists(temp_xml):
                 os.remove(temp_xml)
             
     except Exception as e:
-        print(f"\n❌ ERROR: {str(e)}")
+        print(f"\n[ERROR] {str(e)}")
         if os.path.exists(temp_xml):
             os.remove(temp_xml)
 
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         is_admin = False
     
     if not is_admin:
-        print("⚠️  This script should be run as Administrator!")
+        print("[WARNING] This script should be run as Administrator!")
         print("\nTo run as Administrator:")
         print("1. Open Command Prompt as Administrator")
         print("2. Run: python setup_windows_scheduler.py")

@@ -1,100 +1,26 @@
 # src/extract/twelve_data/base.py
-from typing import Dict, List, Any, Optional, Union
-from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
 import pandas as pd
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 
 from src.utils.logger import logger
 from src.utils.rate_limiter import rate_limiter
 from config.settings import settings
-
-from abc import ABC, abstractmethod
-import requests
+from ..base_extractor import BaseExtractor, ExtractionError   
 
 
-
-class ExtractionError(Exception):
-    """Custom exception for extraction errors"""
-    pass
-
-
-class BaseExtractor(ABC):
-    """Abstract base class for all data extractors"""
-    
-    def __init__(self, source_name: str, api_key: Optional[str] = None):
-        """
-        Initialize base extractor
-        
-        Args:
-            source_name: Name of the data source
-            api_key: Optional API key
-        """
-        self.source_name = source_name
-        self.api_key = api_key
-    
-    @abstractmethod
-    def extract(self, symbol: str, **kwargs) -> pd.DataFrame:
-        """Extract data for a given symbol"""
-        pass
-    
-    @abstractmethod
-    def get_metadata(self) -> Dict[str, Any]:
-        """Get metadata about the extractor"""
-        pass
-    
-    def _make_request(self, endpoint: str, params: Dict[str, Any], **kwargs):
-        """
-        Make HTTP request
-        
-        Args:
-            endpoint: API endpoint
-            params: Request parameters
-            
-        Returns:
-            Response object
-        """
-        # Implementation of HTTP request
-        response = requests.get(endpoint, params=params, **kwargs)
-        response.raise_for_status()
-        return response
-    
-    def _load_source_config(self, source_name: str) -> Dict[str, Any]:
-        """
-        Load configuration for a specific data source
-        
-        Args:
-            source_name: Name of the data source
-            
-        Returns:
-            Configuration dictionary
-        """
-      
-        return {}
 class TwelveDataExtractor(BaseExtractor):
-    """
-    Base extractor for Twelve Data API
-    """
-    
     def __init__(self):
-        """
-        Initialize Twelve Data extractor
-        """
         super().__init__(source_name="twelve_data")
-        
-        # Load Twelve Data specific configuration
         self.config = self._load_source_config("twelve_data")
-        
-        # Set up common API parameters
-        self.api_key = self._get_api_key()
+        self.api_key = settings.get("twelve_data.api_key", "")
         self.base_url = self.config.get("base_url", "https://api.twelvedata.com")
         
-        # Common API parameters
         self.default_params = {
             "apikey": self.api_key,
             "format": "json",
             "timezone": settings.timezone
         }
+      
         
         # Endpoint mappings
         self.endpoints = {

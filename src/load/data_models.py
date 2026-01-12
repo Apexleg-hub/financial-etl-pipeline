@@ -172,7 +172,7 @@ class PipelineMetadata(BaseModel):
     run_id: str = None
     status: str = None
     start_time: datetime = None
-    end_time: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
     records_processed: int = 0
     records_failed: int = 0
     error_message: Optional[str] = None

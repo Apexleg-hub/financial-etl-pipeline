@@ -1,0 +1,80 @@
+# config/sources/twelve_data.yaml
+twelve_data:
+  # API Configuration
+  base_url: "https://api.twelvedata.com"
+  api_key: "${TWELVE_DATA_API_KEY}"  # From environment variable
+  
+  # Rate Limiting
+  rate_limit_requests: 8  # Free tier: 8 requests/min
+  rate_limit_period: 60   # seconds
+  
+  # Default Parameters
+  default_interval: "1day"
+  max_data_points: 5000
+  
+  # Asset-specific defaults
+  forex:
+    default_pairs:
+      - "EUR/USD"
+      - "GBP/USD"
+      - "USD/JPY"
+      - "USD/CHF"
+      - "AUD/USD"
+      - "USD/CAD"
+      - "NZD/USD"
+  
+  stocks:
+    default_stocks:
+      - "AAPL"
+      - "MSFT"
+      - "GOOGL"
+      - "AMZN"
+      - "TSLA"
+      - "META"
+      - "NVDA"
+      - "JPM"
+      - "JNJ"
+      - "V"
+  
+  crypto:
+    default_cryptos:
+      - "BTC/USD"
+      - "ETH/USD"
+      - "BNB/USD"
+      - "XRP/USD"
+      - "ADA/USD"
+      - "SOL/USD"
+      - "DOT/USD"
+      - "DOGE/USD"
+    default_quote_currency: "USD"
+  
+  etfs:
+    default_etfs:
+      - "SPY"
+      - "QQQ"
+      - "VTI"
+      - "IVV"
+      - "VOO"
+      - "ARKK"
+      - "XLF"
+      - "XLK"
+      - "XLE"
+      - "XLV"
+  
+  indices:
+    default_indices:
+      - "DJI"
+      - "IXIC"
+      - "GSPC"
+      - "RUT"
+      - "FTSE"
+      - "N225"
+      - "HSI"
+      - "AXJO"
+  
+  # Extraction Settings
+  extraction:
+    batch_delay: 1.0  # seconds between batch requests
+    retry_attempts: 3
+    timeout: 30
+    max_workers: 5  # for parallel extraction

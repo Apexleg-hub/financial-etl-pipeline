@@ -8,7 +8,6 @@ sys.path.append('.')
 
 import click
 from src.utils.logger import setup_logging
-from src.extract.alpha_vantage import AlphaVantageExtractor
 from src.extract.finnhub import FinnhubExtractor
 from src.extract.fred import FREDExtractor
 from src.extract.weather import WeatherExtractor
@@ -18,7 +17,7 @@ from src.transform.validator import DataValidator
 from src.load.supabase_loader import SupabaseLoader
 from src.load.data_models import StockPrice, EconomicIndicator, WeatherData, ForexRate
 from config.settings import settings
-from src.extract.forex_extractor import ForexExtractor
+
 # Add delay between API calls in run_etl.py
 import time
 time.sleep(12)  # 12 seconds between calls for Alpha Vantage free tier
@@ -568,7 +567,7 @@ def main(pipelines: tuple, symbols: tuple, cities: tuple, indicators: tuple):
     print("ETL RUN SUMMARY")
     print("=" * 60)
     for pipeline, success in sorted(results.items()):
-        status = "✓ SUCCESS" if success else "✗ FAILED"
+        status = "[OK] SUCCESS" if success else "[FAILED]"
         print(f"{pipeline.capitalize():12s}: {status}")
     print(f"Finished at:  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)

@@ -1,4 +1,5 @@
 
+# config/settings.py
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -12,10 +13,16 @@ class Settings(BaseSettings):
     """Application settings"""
     
     # API Keys
-    alpha_vantage_api_key: str = Field(...)
+   
     finnhub_api_key: str = Field(...)
     fred_api_key: str = Field(...)
     openweather_api_key: str = Field(...)
+    mt5_login: Optional[str] = Field(...)
+    polygon_api_key:Optional[str] =Field(... )  
+    twelve_data_api_key: Optional[str] = Field(...)
+
+    
+
     
     # Database
     supabase_url: str = Field(...)
